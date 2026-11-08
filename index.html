@@ -1,0 +1,4164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>单词听默器（离线版）</title>
+<script src="./lib/tesseract.min.js" async></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef2f9;color:#1f2937;
+       font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .app{max-width:800px;margin:0 auto;padding:16px 16px 60px}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px}
+  h1{font-size:19px;margin:0;white-space:nowrap;
+     background:linear-gradient(135deg,#4f7cff,#a06bff);
+     -webkit-background-clip:text;background-clip:text;color:transparent}
+  nav{display:flex;align-items:center;gap:2px}
+  nav button{border:0;background:transparent;padding:8px 12px;border-radius:8px;
+             font-size:14px;cursor:pointer;color:#6b7280;font-weight:500}
+  nav button.active{background:#4f7cff;color:#fff;box-shadow:0 4px 10px rgba(79,124,255,.3)}
+  #soundToggle,#netBadge{font-size:13px;padding:6px 10px;border-radius:8px;line-height:1;font-weight:600}
+  #soundToggle.muted{opacity:.5}
+  #netBadge{background:#dcfce7;color:#166534;font-size:12px}
+  #netBadge.offline{background:#fee2e2;color:#991b1b}
+  .card{background:#fff;border-radius:16px;padding:20px;margin-bottom:14px;
+        box-shadow:0 2px 16px rgba(20,40,90,.08)}
+  .panel-grid{display:flex;flex-direction:column;gap:14px}
+  .panel-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .panel-label{font-size:12px;font-weight:600;color:#8894a8;letter-spacing:.5px;
+               width:64px;flex:0 0 auto;text-transform:uppercase}
+  .panel-label + *{flex:1;min-width:0}
+  select,button,input,textarea{font-family:inherit;font-size:14px}
+  select{padding:10px 12px;border:1.5px solid #e3e9f5;border-radius:10px;
+         background:#fafbff;max-width:100%;color:#1f2937;transition:.15s;font-weight:500;cursor:pointer}
+  select:hover{border-color:#c8d5f2}
+  select:focus{outline:none;border-color:#4f7cff;background:#fff;
+               box-shadow:0 0 0 3px rgba(79,124,255,.12)}
+  .btn{padding:10px 18px;border:0;border-radius:10px;background:#4f7cff;color:#fff;
+       cursor:pointer;font-size:14px;font-weight:600;transition:.15s;
+       box-shadow:0 3px 10px rgba(79,124,255,.25)}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{opacity:.45;cursor:default;box-shadow:none;transform:none}
+  .btn.ghost{background:#eef2ff;color:#3f5fd6;box-shadow:none}
+  .btn.ghost:hover{background:#dde6ff}
+  .btn.danger{background:#fee2e2;color:#b91c1c;box-shadow:none}
+  .btn.danger:hover{background:#fecaca}
+  .btn.mini{padding:7px 12px;font-size:13px;font-weight:500}
+  .btn.green{background:#0f9d58;box-shadow:0 3px 10px rgba(15,157,88,.25)}
+  .btn.green:hover{filter:brightness(1.08)}
+  .btn.excel{background:linear-gradient(135deg,#1d6f42,#2e9d5d);
+             box-shadow:0 3px 10px rgba(29,111,66,.3)}
+  .btn.excel:hover{filter:brightness(1.08)}
+  .btn.dictation{background:linear-gradient(135deg,#d97706,#f59e0b);
+                 box-shadow:0 3px 10px rgba(217,119,6,.3)}
+  .btn.dictation:hover{filter:brightness(1.08)}
+  .rate-wrap{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#8894a8;
+             padding:0 10px;font-weight:600}
+  input[type=range]{width:100px;accent-color:#4f7cff}
+  .accent-toggle{display:flex;background:#f0f3fa;border-radius:10px;padding:3px;gap:2px}
+  .accent-toggle button{border:0;background:transparent;padding:6px 14px;
+    border-radius:8px;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;transition:.15s}
+  .accent-toggle button.active{background:#fff;color:#4f7cff;
+    box-shadow:0 2px 6px rgba(20,40,90,.1)}
+  #progress{font-size:12.5px;color:#8894a8;margin:0 0 12px;font-weight:600;letter-spacing:.3px}
+  #prompt{text-align:center;min-height:60px;display:flex;flex-direction:column;
+          justify-content:center;gap:6px;align-items:center}
+  #prompt .big{font-size:22px;font-weight:600;line-height:1.4}
+  #prompt .sub{font-size:13px;color:#8b95a7}
+  #answer{width:100%;font-size:22px;padding:14px;border:2px solid #e3e9f5;
+          border-radius:12px;outline:none;text-align:center;letter-spacing:1.5px;
+          margin-top:14px;background:#fafbff;transition:.15s;font-weight:500}
+  #answer:focus{border-color:#4f7cff;background:#fff;box-shadow:0 0 0 4px rgba(79,124,255,.1)}
+  #answer.input-bad{border-color:#f0a1a1;background:#fff5f5}
+  #answer.input-ok{border-color:#7fd6a4;background:#f7fdfa}
+  #options{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+  .opt{text-align:left;padding:14px 16px;border:1.5px solid #e3e9f5;background:#fafbff;
+       border-radius:12px;cursor:pointer;font-size:15px;transition:.15s;font-weight:500;color:#1f2937}
+  .opt:hover{border-color:#b9c9f2;background:#f4f7ff;transform:translateX(2px)}
+  .opt.ok{background:#e7f9ef;border-color:#7fd6a4;color:#0f9d58;font-weight:600}
+  .opt.bad{background:#fdeaea;border-color:#f0a1a1;color:#d93025}
+  .feedback{margin-top:12px;font-size:15px;min-height:22px;text-align:center;font-weight:600}
+  .feedback.ok{color:#0f9d58}
+  .feedback.bad{color:#d93025}
+  .actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;justify-content:center}
+  .emoji-fig{font-size:80px;line-height:1;text-align:center;
+             animation:pop .45s ease-out, floaty 3s ease-in-out .45s infinite}
+  .emoji-fig.hero{font-size:104px;margin:6px 0 2px}
+  .letter-fig{width:96px;height:96px;border-radius:22px;margin:6px auto;
+    display:flex;align-items:center;justify-content:center;
+    font-size:44px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,#6a9bff,#a06bff);
+    box-shadow:0 8px 22px rgba(90,120,255,.28);animation:pop .45s ease-out}
+  .letter-fig.hero{width:110px;height:110px;font-size:52px}
+  .letter-fig.mini{width:22px;height:22px;font-size:12px;border-radius:6px;margin:0;
+    animation:none;box-shadow:none}
+  @keyframes pop{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+  .study-card{text-align:center;padding:6px 0 2px}
+  .study-word{font-size:34px;font-weight:700;letter-spacing:.6px;margin-top:6px;
+              color:#1e293b;word-break:break-word;cursor:pointer;display:inline-block;transition:.15s}
+  .study-word:hover{color:#4f7cff}
+  .study-phonetic{font-size:16px;color:#7c88a3;font-family:ui-monospace,Menlo,monospace;
+                  margin-top:4px;letter-spacing:.5px}
+  .study-meta{font-size:13px;color:#8b95a7;margin-top:8px}
+  .study-pos{display:inline-block;background:#e0e7ff;color:#3730a3;font-size:12px;
+             padding:2px 9px;border-radius:7px;margin:0 3px;font-weight:600}
+  .study-zh{font-size:20px;color:#334155;margin:12px 0 4px;font-weight:500}
+  .study-block{margin-top:16px;text-align:left;background:#f8faff;border-radius:12px;
+               padding:12px 14px;border:1px solid #eef2fc}
+  .study-label{font-size:11.5px;color:#7c88a3;letter-spacing:1px;margin-bottom:8px;
+               font-weight:600;text-transform:uppercase}
+  .say-line{font-size:16px;color:#1f2937;line-height:1.55;
+            cursor:pointer;padding:5px 8px;border-radius:8px;transition:.15s}
+  .say-line:hover{background:#eef2ff}
+  .say-line::after{content:' 🔊';font-size:12px;opacity:.55}
+  .say-line-zh{font-size:13.5px;color:#8b95a7;padding:0 8px;line-height:1.5}
+  .chunk-card{background:#fff;border:1px solid #e3ebff;border-radius:10px;
+              padding:10px 12px;margin-bottom:8px}
+  .chunk-card:last-child{margin-bottom:0}
+  .chunk-text{display:inline-block;background:#eef2ff;color:#3f5fd6;
+              font-size:14px;font-weight:600;padding:4px 12px;border-radius:20px;
+              cursor:pointer;user-select:none;transition:.15s}
+  .chunk-text:hover{background:#dde6ff}
+  .chunk-text::after{content:' 🔊';font-size:11px;opacity:.65}
+  .chunk-ex{font-size:14px;color:#374151;margin-top:8px;cursor:pointer;
+            padding:4px 6px;border-radius:6px;line-height:1.5;transition:.15s}
+  .chunk-ex:hover{background:#f1f5ff}
+  .chunk-ex::before{content:'· ';color:#9aa5b8}
+  .chunk-ex::after{content:' 🔊';font-size:11px;opacity:.5}
+  .chunk-ex-zh{font-size:12.5px;color:#8b95a7;padding-left:14px;line-height:1.5;margin-top:2px}
+  .pronounce-card{text-align:center;padding:12px 8px}
+  .pronounce-word{font-size:38px;font-weight:700;letter-spacing:.6px;color:#1e293b;
+                  margin-top:8px;word-break:break-word}
+  .pronounce-phonetic{font-size:17px;color:#7c88a3;
+                      font-family:ui-monospace,Menlo,monospace;margin-top:6px;letter-spacing:.5px}
+  .pronounce-tip{font-size:13px;color:#8b95a7;margin-top:14px;line-height:1.6}
+  .record-btn{margin-top:16px;padding:16px 34px;border-radius:50px;font-size:16px;
+              background:linear-gradient(135deg,#ff6b6b,#ff8e53);color:#fff;border:0;
+              cursor:pointer;font-weight:700;letter-spacing:.5px;
+              box-shadow:0 8px 22px rgba(255,107,107,.32);transition:.2s}
+  .record-btn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(255,107,107,.4)}
+  .record-btn:disabled{opacity:.55;cursor:default;transform:none}
+  .record-btn.listening{background:linear-gradient(135deg,#4f7cff,#a06bff);
+                        box-shadow:0 8px 22px rgba(79,124,255,.4);
+                        animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  #recordStatus{font-size:14px;color:#6b7280;margin-top:14px;min-height:22px;font-weight:500}
+  .stars-display{font-size:44px;letter-spacing:8px;margin-top:12px;min-height:56px;transition:.2s}
+  .stars-display .s{display:inline-block;opacity:.18;transition:.3s}
+  .stars-display .s.on{opacity:1;animation:starPop .5s cubic-bezier(.34,1.56,.64,1) both}
+  .stars-display .s.on:nth-child(2){animation-delay:.15s}
+  .stars-display .s.on:nth-child(3){animation-delay:.3s}
+  @keyframes starPop{0%{transform:scale(0) rotate(-180deg)}100%{transform:scale(1) rotate(0)}}
+  .recognize-result{font-size:13px;color:#8b95a7;margin-top:10px;min-height:20px;line-height:1.5}
+  .recognize-result b{color:#3f5fd6}
+  .hint{font-size:12.5px;color:#8b95a7;line-height:1.7;margin:8px 0}
+  .hint code{background:#eef2ff;padding:1px 5px;border-radius:4px;color:#3f5fd6}
+  .field{display:flex;align-items:center;gap:6px;font-size:13px;color:#6b7280}
+  .field input[type=text]{padding:8px 12px;border:1.5px solid #e3e9f5;border-radius:10px;
+    font-size:13px;background:#fafbff}
+  .field input[type=text]:focus{outline:none;border-color:#4f7cff;background:#fff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  textarea{width:100%;min-height:150px;padding:12px;border:1.5px solid #e3e9f5;
+           border-radius:12px;resize:vertical;line-height:1.6;font-size:14px;background:#fafbff}
+  textarea:focus{outline:none;border-color:#4f7cff;background:#fff}
+  .word-item{border-bottom:1px solid #f0f3f9}
+  .word-item:last-child{border-bottom:0}
+  .row{display:flex;align-items:center;gap:8px;padding:10px 4px;font-size:14px}
+  .row input[type=checkbox]{width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:#4f7cff}
+  .row .mini-fig{font-size:20px;flex:0 0 auto;width:26px;text-align:center;line-height:1}
+  .row .w{font-weight:600;min-width:70px;word-break:break-word}
+  .row .d{color:#6b7280;flex:1;min-width:0;word-break:break-word}
+  .cat-tag{font-size:11px;background:#e0e7ff;color:#3730a3;padding:2px 7px;
+           border-radius:6px;white-space:nowrap;font-weight:600}
+  .tag{font-size:11px;background:#fee2e2;color:#b91c1c;padding:2px 6px;
+       border-radius:6px;white-space:nowrap;font-weight:600}
+  .row button{border:0;background:transparent;color:#c3cbd9;font-size:17px;
+              cursor:pointer;padding:0 3px;line-height:1}
+  .row button:hover{color:#d93025}
+  .row button.edit{font-size:14px}
+  .row button.edit:hover,.row button[data-save]:hover{color:#4f7cff}
+  .row-error{display:none;color:#d93025;font-size:12.5px;padding:0 4px 8px 30px;line-height:1.5}
+  .row-error.show{display:block}
+  .row-error.warn{color:#b45309}
+  .edit-input{padding:8px 10px;border:1.5px solid #e3e9f5;border-radius:9px;
+    font-size:13.5px;min-width:0;background:#fafbff}
+  .edit-input.w{flex:0 0 140px}
+  .edit-input.d{flex:1}
+  .edit-input:focus{outline:none;border-color:#4f7cff;background:#fff}
+  .edit-input.input-bad{border-color:#f0a1a1;background:#fff5f5}
+  .edit-input.input-ok{border-color:#7fd6a4;background:#f7fdfa}
+  .edit-select{padding:8px;border:1.5px solid #e3e9f5;border-radius:9px;font-size:13px;background:#fafbff}
+  .edit-select:focus{outline:none;border-color:#4f7cff}
+  .toast{position:fixed;left:50%;bottom:30px;transform:translate(-50%,20px);
+         background:#1f2937;color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;
+         opacity:0;transition:.25s;z-index:99;max-width:80vw;white-space:pre-wrap;
+         box-shadow:0 8px 24px rgba(0,0,0,.22);font-weight:500}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast.ok{background:#0f9d58}
+  .toast.err{background:#d93025}
+  #hintBox{text-align:center;font-size:14px;color:#6b7280;margin-top:12px}
+  #hintBox .hint-line{margin:4px 0}
+  #hintBox .hint-line b{color:#3f5fd6}
+  #hintBox .hint-mask{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:20px;
+                      letter-spacing:3px;color:#4f7cff;margin:8px 0;font-weight:600;
+                      word-break:break-all}
+  .bulk-status{font-size:13px;margin-top:8px;min-height:20px;padding:8px 12px;
+               border-radius:10px;transition:.2s;line-height:1.5;word-break:break-word}
+  .bulk-status.ok{background:#e7f9ef;color:#0f9d58}
+  .bulk-status.bad{background:#fdeaea;color:#d93025}
+  .loading{display:inline-block;width:14px;height:14px;border:2px solid #c7d5f5;
+           border-top-color:#4f7cff;border-radius:50%;animation:spin .7s linear infinite;
+           vertical-align:-2px;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .quick-preview{margin-top:12px;display:none}
+  .quick-preview.show{display:block}
+  .quick-card{display:flex;gap:14px;align-items:flex-start;background:#f8faff;
+              border:1px solid #e3ebff;border-radius:12px;padding:14px}
+  .quick-card .qc-fig{flex:0 0 auto;font-size:48px;line-height:1;animation:pop .4s ease-out}
+  .quick-card .qc-body{flex:1;min-width:0}
+  .quick-card .qc-w{font-size:19px;font-weight:700}
+  .quick-card .qc-zh{color:#334155;margin-top:2px}
+  .quick-card .qc-extra{font-size:12.5px;color:#8b95a7;margin-top:8px;line-height:1.7}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:6px;
+         margin-right:4px;font-weight:600}
+  .badge.local{background:#dcfce7;color:#166534}
+  .badge.online{background:#dbeafe;color:#1e40af}
+  .badge.fail{background:#fee2e2;color:#991b1b}
+  #ocrArea{display:none;margin-top:12px;background:#f8faff;border:1px solid #e3ebff;
+           border-radius:12px;padding:12px}
+  #ocrArea.show{display:block}
+  #ocrPreview{max-width:100%;max-height:220px;border-radius:8px;display:block;margin:0 auto}
+  #ocrStatus{font-size:13px;color:#6b7280;margin-top:10px;text-align:center;min-height:20px}
+  .progress-bar{height:6px;background:#e5e9f5;border-radius:3px;overflow:hidden;margin-top:8px}
+  .progress-bar > div{height:100%;background:linear-gradient(90deg,#6a9bff,#a06bff);
+                      width:0;transition:width .2s}
+  .backup-panel{display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+                background:linear-gradient(135deg,#f0f7ff,#f5f0ff);
+                border:1.5px solid #dde6ff;border-radius:14px;padding:14px 16px;margin-bottom:14px}
+  .backup-icon{font-size:24px;line-height:1}
+  .backup-info{flex:1;min-width:180px}
+  .backup-title{font-size:14px;font-weight:700;color:#3f5fd6;margin-bottom:3px}
+  .backup-status{font-size:12.5px;color:#7c88a3;line-height:1.5}
+  .backup-status.ok{color:#0f9d58}
+  .backup-status.warn{color:#b45309}
+  .backup-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .backup-actions .btn{padding:8px 14px;font-size:13px}
+  .excel-panel{background:linear-gradient(135deg,#f0fbf4,#e6f7ee);
+               border:1.5px solid #c8ebd6;border-radius:14px;padding:16px;margin-bottom:14px}
+  .excel-title{font-size:14.5px;font-weight:700;color:#1d6f42;margin-bottom:6px;
+               display:flex;align-items:center;gap:6px}
+  .excel-desc{font-size:12.5px;color:#4b6f57;line-height:1.6;margin-bottom:12px}
+  .excel-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .excel-actions .btn{padding:10px 16px}
+  .excel-hint{font-size:12px;color:#4b6f57;margin-top:10px;padding:8px 12px;
+              background:rgba(255,255,255,.6);border-radius:8px;
+              border-left:3px solid #2e9d5d;line-height:1.5}
+  .dictation-panel{background:linear-gradient(135deg,#fff7ed,#ffedd5);
+                   border:1.5px solid #fed7aa;border-radius:14px;padding:16px;margin-bottom:14px}
+  .dictation-title{font-size:14.5px;font-weight:700;color:#9a3412;margin-bottom:6px;
+                   display:flex;align-items:center;gap:6px}
+  .dictation-desc{font-size:12.5px;color:#9a3412;line-height:1.6;margin-bottom:12px}
+  .dictation-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .dictation-actions .btn{padding:10px 16px}
+  .cat-row{display:flex;align-items:center;gap:8px;padding:10px 4px;
+           border-bottom:1px solid #f0f3f9;font-size:14px}
+  .cat-row:last-child{border-bottom:0}
+  .cat-row .cat-name{font-weight:600;color:#1f2937;min-width:80px;word-break:break-word}
+  .cat-row .cat-count{font-size:12.5px;color:#7c88a3;flex:1}
+  .cat-row button{border:0;background:transparent;color:#c3cbd9;font-size:18px;
+                  cursor:pointer;padding:0 4px;line-height:1;transition:.15s}
+  .cat-row button:hover:not(:disabled){color:#d93025}
+  .cat-row button:disabled{opacity:.3;cursor:not-allowed}
+  .cat-radio{display:flex;align-items:center;gap:8px;padding:10px 12px;
+             border:1.5px solid #e3e9f5;border-radius:10px;
+             font-size:14px;margin-bottom:8px;cursor:pointer;
+             background:#fafbff;transition:.15s;flex-wrap:wrap}
+  .cat-radio:hover{border-color:#c8d5f2}
+  .cat-radio input[type=radio]{accent-color:#4f7cff;flex:0 0 auto}
+  .cat-radio select{padding:6px 10px;border:1.5px solid #e3e9f5;border-radius:8px;
+                    background:#fff;font-size:13px;flex:0 0 auto;min-width:110px}
+  .modal-mask{position:fixed;inset:0;background:rgba(20,40,90,.42);
+              display:flex;align-items:center;justify-content:center;z-index:999;
+              opacity:0;transition:.2s;backdrop-filter:blur(2px)}
+  .modal-mask.show{opacity:1}
+  .modal{background:#fff;border-radius:18px;padding:24px;max-width:420px;
+         width:88%;box-shadow:0 20px 60px rgba(0,0,0,.2);
+         transform:scale(.92) translateY(10px);transition:.25s cubic-bezier(.34,1.56,.64,1)}
+  .modal-mask.show .modal{transform:scale(1) translateY(0)}
+  .modal-icon{font-size:44px;text-align:center;line-height:1;margin-bottom:8px}
+  .modal-title{font-size:17px;font-weight:700;text-align:center;margin:0 0 10px;color:#1f2937}
+  .modal-message{font-size:14px;color:#6b7280;text-align:center;line-height:1.6;
+                 margin-bottom:20px;word-break:break-word}
+  .modal-message b{color:#d93025;font-weight:600}
+  .modal-actions{display:flex;gap:10px}
+  .modal-actions button{flex:1;padding:12px;border-radius:10px;font-size:14px;
+                        font-weight:600;cursor:pointer;border:0;transition:.15s}
+  .modal-cancel{background:#f0f3fa;color:#4b5563}
+  .modal-cancel:hover{background:#e5e9f5}
+  .modal-confirm{background:#d93025;color:#fff}
+  .modal-confirm:hover{filter:brightness(1.08)}
+  .modal-confirm.safe{background:#4f7cff}
+  .modal-confirm.safe:hover{filter:brightness(1.08)}
+  .listen-retry-badge{display:inline-block;background:#fff3cd;color:#856404;
+                      padding:6px 14px;border-radius:20px;font-size:13px;
+                      font-weight:600;margin-top:8px;border:1px solid #ffeaa7}
+
+  /* ===== 多选分类（默写纸） ===== */
+  .ms{position:relative;display:inline-block}
+  .ms-btn{padding:10px 14px;border:1.5px solid #fed7aa;border-radius:10px;background:#fff;
+          font-size:13.5px;font-weight:600;color:#9a3412;cursor:pointer;
+          max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ms-btn:hover{border-color:#f59e0b;background:#fffbf5}
+  .ms-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:60;background:#fff;
+          border:1.5px solid #fed7aa;border-radius:12px;
+          box-shadow:0 10px 30px rgba(0,0,0,.14);
+          padding:10px;min-width:210px;max-height:300px;overflow:auto}
+  .ms-pop[hidden]{display:none}
+  .ms-tools{display:flex;gap:6px;margin-bottom:8px}
+  .ms-tools button{flex:1;padding:6px;border:0;border-radius:8px;background:#fff7ed;
+                   color:#9a3412;font-size:12.5px;font-weight:600;cursor:pointer}
+  .ms-tools button:hover{background:#ffedd5}
+  .ms-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;
+           font-size:13.5px;cursor:pointer;color:#374151;user-select:none}
+  .ms-item:hover{background:#fff7ed}
+  .ms-item input{accent-color:#d97706;width:16px;height:16px;flex:0 0 auto}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>📖 单词听默器</h1>
+    <nav>
+      <button data-tab="study" class="active">学习</button>
+      <button data-tab="edit">词库</button>
+      <button id="netBadge" title="网络状态">离线</button>
+      <button id="soundToggle" title="音效开关">🔊</button>
+    </nav>
+  </header>
+
+  <section id="tab-study">
+    <div class="card">
+      <div class="panel-grid">
+        <div class="panel-row">
+          <span class="panel-label">学习模式</span>
+          <select id="mode">
+            <option value="card">📇 单词卡片（图文·搭配·例句）</option>
+            <option value="pronounce">🎤 发音测试（跟读评分）</option>
+            <option value="choose">🔊 听音选义（听发音选释义）</option>
+            <option value="mean">📝 看义默写（看图看中文拼词）</option>
+            <option value="listen">🎧 听音默写（听发音拼词）</option>
+          </select>
+        </div>
+        <div class="panel-row">
+          <span class="panel-label">学习范围</span>
+          <select id="scope">
+            <option value="all">全部单词</option>
+            <option value="wrong">只练错词</option>
+          </select>
+          <select id="catSel" style="flex:0 0 auto;min-width:130px"></select>
+          <select id="countSel" style="flex:0 0 auto;min-width:130px">
+            <option value="10">本轮 10 个</option>
+            <option value="20" selected>本轮 20 个</option>
+            <option value="30">本轮 30 个</option>
+            <option value="50">本轮 50 个</option>
+            <option value="100">本轮 100 个</option>
+            <option value="0">本轮全部</option>
+          </select>
+        </div>
+        <div class="panel-row">
+          <span class="panel-label">发音设置</span>
+          <div class="accent-toggle" id="accentToggle">
+            <button data-accent="us" class="active">🇺🇸 美式</button>
+            <button data-accent="uk">🇬🇧 英式</button>
+          </div>
+          <div class="rate-wrap">语速
+            <input type="range" id="rate" min="0.5" max="1.2" step="0.05" value="0.85">
+          </div>
+          <button class="btn" id="startBtn" style="margin-left:auto">开始 / 重新开始</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="progress">尚未开始</div>
+      <div id="prompt"><div class="sub">选择模式后点击「开始」</div></div>
+      <div id="cardStudy" hidden></div>
+      <div id="pronounceArea" hidden></div>
+      <div id="options"></div>
+      <input id="answer" style="display:none" placeholder="输入英文单词"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div id="feedback" class="feedback"></div>
+      <div id="hintBox"></div>
+      <div class="actions">
+        <button class="btn ghost" id="prevBtn">⬅ 上一题</button>
+        <button class="btn ghost" id="spellBtn">🔤 拼读</button>
+        <button class="btn ghost" id="playBtn">🔊 播放发音</button>
+        <button class="btn ghost" id="playSentenceBtn" style="display:none">📢 读例句</button>
+        <button class="btn ghost" id="hintBtn">💡 提示</button>
+        <button class="btn ghost" id="showAnswerBtn" style="display:none">👁️ 显示答案</button>
+        <button class="btn" id="submitBtn" disabled>提交</button>
+        <button class="btn ghost" id="nextBtn">下一题 ➜</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-edit" hidden>
+    <div class="backup-panel">
+      <div class="backup-icon">🛡️</div>
+      <div class="backup-info">
+        <div class="backup-title">自动备份保护</div>
+        <div class="backup-status" id="backupStatus">正在检查…</div>
+      </div>
+      <div class="backup-actions">
+        <button class="btn green mini" id="backupNowBtn">💾 立即备份</button>
+        <button class="btn ghost mini" id="downloadBackupBtn">⬇ 下载备份文件</button>
+        <button class="btn ghost mini" id="restoreBackupBtn">⬆ 从文件恢复</button>
+      </div>
+      <input type="file" id="restoreFile" accept=".json,application/json" style="display:none">
+    </div>
+
+    <div class="excel-panel">
+      <div class="excel-title">📊 Excel 导入 / 导出</div>
+      <div class="excel-desc">
+        <b>导入</b>：下载模板 → 用 Excel 或 Numbers 填写 → 上传，一键导入。<br>
+        <b>导出</b>：把当前词库导出为 Excel 模板格式。类型会按 <b>20 个一组</b> 自动拆分后缀。
+      </div>
+      <div class="excel-actions">
+        <button class="btn excel" id="downloadTplBtn">📥 下载空白模板</button>
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none">
+        <button class="btn" id="excelUploadBtn">📤 上传 Excel 文件</button>
+        <span class="field" style="margin-left:auto">导出范围
+          <select id="excelExportCat" style="min-width:150px"></select>
+        </span>
+        <button class="btn green" id="excelExportBtn">📊 导出为 Excel</button>
+      </div>
+      <div class="excel-hint">
+        💡 导出时，同一类型的单词会按 20 个一组自动添加数字后缀：第 1-20 个 → <code>类型01</code>，
+        第 21-40 个 → <code>类型02</code>，依此类推；不满 20 个的类型不添加后缀。
+      </div>
+    </div>
+
+    <!-- ===== 默写纸导出（支持多选分类） ===== -->
+    <div class="dictation-panel">
+      <div class="dictation-title">📝 导出默写纸</div>
+      <div class="dictation-desc">
+        按类型生成默写纸，<b>一行三个单词</b>，中文放在四线格上方，四线格用真实边框绘制，<b>打印和 PDF 都能显示</b>。<br>
+        打印时请在浏览器打印对话框选择 <b>A4</b>、边距 <b>默认</b>，并勾选 <b>「背景图形」</b>。
+      </div>
+      <div class="dictation-actions">
+        <span class="field" style="color:#9a3412">导出范围
+          <div class="ms" id="dictationCatMS">
+            <button type="button" class="ms-btn" id="dictationCatBtn">全部分类 ▾</button>
+            <div class="ms-pop" id="dictationCatPop" hidden>
+              <div class="ms-tools">
+                <button type="button" id="dictationCatAll">全选</button>
+                <button type="button" id="dictationCatNone">清空</button>
+              </div>
+              <div id="dictationCatList"></div>
+            </div>
+          </div>
+        </span>
+        <button class="btn dictation" id="dictationExportBtn">📝 生成默写纸</button>
+      </div>
+      <div class="excel-hint" style="border-left-color:#f59e0b;color:#9a3412;background:rgba(255,255,255,.65)">
+        💡 可以勾选<b>多个类型</b>一起生成；不勾选任何类型时默认导出全部分类。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <span class="panel-label" style="width:auto">🗂️ 类型管理</span>
+        <span class="field" id="catSummary" style="margin-left:auto"></span>
+      </div>
+      <div class="hint">
+        删除不需要的类型。如果类型下还有单词，会询问把单词移到其他类型还是一并删除。
+        「默认」类型不可删除。
+      </div>
+      <div id="catList"></div>
+    </div>
+
+    <div class="card">
+      <div class="hint">
+        <b>✨ 智能录入</b>：输入单词自动匹配释义、类型、配图、音标和例句。
+        <b>联网时</b>用在线词典补全，<b>离线时</b>用内置词典（未收录的可手动填写）。
+      </div>
+      <div class="toolbar">
+        <input type="text" id="quickWord" placeholder="例如：apple / take off / resilient"
+               autocomplete="off" autocorrect="off" spellcheck="false"
+               style="flex:1;min-width:180px;padding:11px 14px;border:1.5px solid #e3e9f5;
+                      border-radius:10px;font-size:14px;background:#fafbff">
+        <button class="btn ghost" id="quickLookupBtn">🔍 匹配</button>
+        <button class="btn" id="quickAddBtn" disabled>＋ 加入词库</button>
+      </div>
+      <div class="quick-preview" id="quickPreview"></div>
+    </div>
+
+    <div class="card">
+      <div class="hint">
+        <b>📷 拍照识别</b>：拍一张书页或笔记，自动识别其中的英文单词，结果会填入下方文本框。
+        <b>离线可用</b>（依赖已本地化）。
+      </div>
+      <div class="toolbar">
+        <input type="file" id="ocrFile" accept="image/*" capture="environment" style="display:none">
+        <button class="btn" id="ocrBtn">📷 拍照 / 选图片识别</button>
+        <button class="btn ghost" id="ocrClearBtn" style="display:none">清除</button>
+      </div>
+      <div id="ocrArea">
+        <img id="ocrPreview" alt="预览">
+        <div id="ocrStatus"></div>
+        <div class="progress-bar" id="ocrProgress" style="display:none"><div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hint">
+        <b>每行一个单词或词块</b>，支持三种格式：<br>
+        <code>word | 中文释义</code>　或　<code>word | 中文释义 | 类型</code>　或　<code>word,中文</code><br>
+        以 <code>#</code> 开头会被忽略。词块没有类型列时，会自动归入「短语」类型。
+      </div>
+      <textarea id="bulk" placeholder="apple | 苹果 | 水果&#10;take off | 起飞&#10;abandon | 放弃，抛弃 | 动作"></textarea>
+      <div id="bulkStatus" class="bulk-status"></div>
+      <div class="toolbar" style="margin-top:12px">
+        <span class="field">导入到类型
+          <select id="importCat"></select>
+        </span>
+        <span class="field">
+          <input type="text" id="newCatInput" placeholder="新类型名称" style="width:120px">
+          <button class="btn ghost mini" id="addCatBtn">＋ 新建类型</button>
+        </span>
+      </div>
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn" id="saveBtn">覆盖导入</button>
+        <button class="btn ghost" id="appendBtn">追加导入</button>
+        <span class="field" style="margin-left:auto">文本导出范围
+          <select id="exportCat" style="min-width:150px"></select>
+        </span>
+        <button class="btn ghost" id="exportBtn">📤 导出文本</button>
+        <button class="btn danger" id="clearBtn">清空词库</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" id="searchInput" placeholder="🔍 搜索单词或释义"
+               style="padding:10px 12px;border:1.5px solid #e3e9f5;border-radius:10px;
+                      flex:1;min-width:140px;background:#fafbff">
+        <select id="catFilter"></select>
+        <button class="btn ghost mini" id="selectAllBtn">全选</button>
+        <button class="btn ghost mini" id="clearSelBtn">取消选择</button>
+        <span class="field" id="selInfo">已选 0 个</span>
+      </div>
+      <div class="toolbar" style="margin-top:8px">
+        <select id="batchCat"></select>
+        <button class="btn ghost mini" id="batchMoveBtn">设为该类型</button>
+        <button class="btn ghost mini" id="batchNewCatBtn">＋ 新建类型并应用</button>
+        <button class="btn ghost mini" id="enrichBtn">🪄 智能补全</button>
+        <button class="btn danger mini" id="batchDelBtn">删除选中</button>
+      </div>
+      <div id="listInfo" class="hint"></div>
+      <div id="wordList"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* ==========================================================
+   🌐 离线/在线双轨
+   ========================================================== */
+let isOnline = navigator.onLine;
+function updateNetBadge(){
+  const b = $('#netBadge');
+  if (!b) return;
+  if (isOnline){ b.textContent = '在线'; b.classList.remove('offline'); }
+  else { b.textContent = '离线'; b.classList.add('offline'); }
+}
+window.addEventListener('online', () => {
+  isOnline = true; updateNetBadge();
+  toast('网络已恢复，正在后台补全词条…', 'ok');
+  setTimeout(() => autoUpdatePendingItems(), 1500);
+});
+window.addEventListener('offline', () => {
+  isOnline = false; updateNetBadge();
+  toast('已切换到离线模式，全部功能本地运行', '');
+});
+
+/* ===================== 工具 ===================== */
+const $ = s => document.querySelector(s);
+const uid = () => 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const escapeHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--){ const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+function toast(msg, type){
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 10);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+}
+function confirmDialog(opts){
+  return new Promise(resolve => {
+    const { title = '确认操作', message = '', icon = '⚠️',
+            confirmText = '确认', cancelText = '取消', danger = true } = opts || {};
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = `
+      <div class="modal">
+        <div class="modal-icon">${icon}</div>
+        <div class="modal-title">${escapeHtml(title)}</div>
+        <div class="modal-message">${message}</div>
+        <div class="modal-actions">
+          <button class="modal-cancel">${escapeHtml(cancelText)}</button>
+          <button class="modal-confirm ${danger ? '' : 'safe'}">${escapeHtml(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+    requestAnimationFrame(() => mask.classList.add('show'));
+    const close = ok => {
+      mask.classList.remove('show');
+      setTimeout(() => { mask.remove(); resolve(ok); }, 220);
+    };
+    mask.querySelector('.modal-cancel').onclick = () => { playSound('click'); close(false); };
+    mask.querySelector('.modal-confirm').onclick = () => { playSound('click'); close(true); };
+    mask.onclick = e => { if (e.target === mask) close(false); };
+    document.addEventListener('keydown', function esc(e){
+      if (e.key === 'Escape'){ close(false); document.removeEventListener('keydown', esc); }
+    });
+  });
+}
+function deleteCatDialog(cat, count, otherCats){
+  return new Promise(resolve => {
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    const optionHtml = otherCats.length
+      ? `<label class="cat-radio">
+           <input type="radio" name="delcat-action" value="move" checked>
+           <span>将单词移动到</span>
+           <select id="delcat-target">
+             ${otherCats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+           </select>
+         </label>
+         <label class="cat-radio">
+           <input type="radio" name="delcat-action" value="delete">
+           <span>同时删除这些单词（<b>不可恢复</b>）</span>
+         </label>`
+      : `<label class="cat-radio">
+           <input type="radio" name="delcat-action" value="delete" checked>
+           <span>同时删除这些单词（没有其他类型可移动）</span>
+         </label>`;
+    mask.innerHTML = `
+      <div class="modal">
+        <div class="modal-icon">🗂️</div>
+        <div class="modal-title">删除类型「${escapeHtml(cat)}」</div>
+        <div class="modal-message" style="text-align:left;margin-bottom:12px">
+          该类型下有 <b>${count}</b> 个单词，请选择处理方式：
+        </div>
+        <div style="margin-bottom:18px">${optionHtml}</div>
+        <div class="modal-actions">
+          <button class="modal-cancel">取消</button>
+          <button class="modal-confirm">确认删除</button>
+        </div>
+      </div>`;
+    document.body.appendChild(mask);
+    requestAnimationFrame(() => mask.classList.add('show'));
+    const close = result => {
+      mask.classList.remove('show');
+      setTimeout(() => { mask.remove(); resolve(result); }, 220);
+    };
+    mask.querySelector('.modal-cancel').onclick = () => { playSound('click'); close(null); };
+    mask.querySelector('.modal-confirm').onclick = () => {
+      const checked = mask.querySelector('input[name="delcat-action"]:checked');
+      const action = checked ? checked.value : 'delete';
+      playSound('click');
+      if (action === 'move'){
+        const targetSel = mask.querySelector('#delcat-target');
+        if (!targetSel){ close(null); return; }
+        close({ action: 'move', target: targetSel.value });
+      } else {
+        close({ action: 'delete' });
+      }
+    };
+    mask.onclick = e => { if (e.target === mask) close(null); };
+  });
+}
+function formatTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = Date.now();
+  const diff = now - ts;
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  let ago = '';
+  if (diff < 60000) ago = '刚刚';
+  else if (diff < 3600000) ago = Math.floor(diff / 60000) + ' 分钟前';
+  else if (diff < 86400000) ago = Math.floor(diff / 3600000) + ' 小时前';
+  else ago = Math.floor(diff / 86400000) + ' 天前';
+  return `${time}（${ago}）`;
+}
+
+/* ===================== 音效引擎 ===================== */
+const LS_SOUND = 'wordTrainer.sound.v1';
+let soundEnabled = localStorage.getItem(LS_SOUND) !== 'off';
+let audioCtx = null;
+const lastSoundTime = {};
+function getCtx(){
+  if (!audioCtx){
+    try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; audioCtx = new AC(); }
+    catch(e){ return null; }
+  }
+  if (audioCtx.state === 'suspended'){ audioCtx.resume().catch(() => {}); }
+  return audioCtx;
+}
+function tone(freq, dur, startAt, type, vol){
+  const ctx = getCtx(); if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.type = type || 'sine'; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(vol || 0.15, startAt + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(startAt); osc.stop(startAt + dur + 0.03);
+  } catch(e){}
+}
+function playSound(name){
+  if (!soundEnabled) return;
+  const now = performance.now();
+  const minGap = (name === 'error' || name === 'tick') ? 400 : 180;
+  if (lastSoundTime[name] && now - lastSoundTime[name] < minGap) return;
+  lastSoundTime[name] = now;
+  const ctx = getCtx(); if (!ctx) return;
+  const t = ctx.currentTime + 0.01;
+  switch(name){
+    case 'correct': tone(523.25,0.12,t,'sine',0.18); tone(659.25,0.12,t+0.10,'sine',0.18); tone(783.99,0.22,t+0.20,'sine',0.20); break;
+    case 'wrong': tone(293.66,0.16,t,'sawtooth',0.10); tone(207.65,0.28,t+0.14,'sawtooth',0.10); break;
+    case 'hint': tone(880,0.10,t,'triangle',0.12); tone(1174.7,0.10,t+0.08,'triangle',0.10); break;
+    case 'start': tone(440,0.10,t,'sine',0.14); tone(659.25,0.14,t+0.09,'sine',0.14); break;
+    case 'complete': [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,0.18,t+i*0.11,'triangle',0.16)); break;
+    case 'save': tone(659.25,0.08,t,'sine',0.10); tone(987.77,0.12,t+0.07,'sine',0.10); break;
+    case 'backup': tone(587.33,0.09,t,'sine',0.12); tone(880,0.12,t+0.08,'sine',0.12); tone(1174.7,0.18,t+0.18,'triangle',0.13); break;
+    case 'restore': tone(880,0.10,t,'triangle',0.13); tone(659.25,0.14,t+0.09,'triangle',0.13); tone(523.25,0.20,t+0.20,'sine',0.14); break;
+    case 'match': tone(783.99,0.09,t,'sine',0.12); tone(1046.5,0.09,t+0.07,'sine',0.12); tone(1318.5,0.16,t+0.14,'triangle',0.13); break;
+    case 'excel': tone(523.25,0.09,t,'triangle',0.13); tone(783.99,0.10,t+0.08,'triangle',0.13); tone(1046.5,0.16,t+0.17,'sine',0.13); break;
+    case 'delete': tone(233.08,0.10,t,'square',0.09); tone(155.56,0.16,t+0.08,'square',0.09); break;
+    case 'error': tone(220,0.07,t,'square',0.12); tone(174.61,0.09,t+0.07,'square',0.12); break;
+    case 'tick': tone(1174.7,0.05,t,'sine',0.07); break;
+    case 'click': tone(1200,0.03,t,'sine',0.05); break;
+    case 'ocr': tone(587.33,0.10,t,'sine',0.13); tone(880,0.14,t+0.09,'sine',0.13); break;
+    case 'star3': [523.25,659.25,783.99,1046.5,1318.5].forEach((f,i)=>tone(f,0.18,t+i*0.09,'triangle',0.16)); tone(1568,0.4,t+0.5,'triangle',0.15); break;
+    case 'star2': tone(523.25,0.15,t,'triangle',0.16); tone(783.99,0.28,t+0.14,'triangle',0.16); break;
+    case 'star1': tone(440,0.28,t,'sine',0.13); break;
+    case 'star0': tone(196,0.20,t,'sawtooth',0.11); tone(155.56,0.32,t+0.18,'sawtooth',0.11); break;
+  }
+}
+function setSoundEnabled(on){
+  soundEnabled = on;
+  localStorage.setItem(LS_SOUND, on ? 'on' : 'off');
+  const btn = $('#soundToggle');
+  if (btn){
+    btn.textContent = on ? '🔊' : '🔇';
+    btn.title = on ? '音效已开启（点击关闭）' : '音效已关闭（点击开启）';
+    btn.classList.toggle('muted', !on);
+  }
+  if (on) playSound('click');
+}
+
+/* ===================== 发音口音 ===================== */
+const LS_ACCENT = 'wordTrainer.accent.v1';
+let accent = localStorage.getItem(LS_ACCENT) || 'us';
+function setAccent(a){
+  accent = a;
+  localStorage.setItem(LS_ACCENT, a);
+  document.querySelectorAll('#accentToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.accent === a);
+  });
+}
+
+/* ===================== 备份系统 ===================== */
+const BACKUP_DB = 'wordTrainerBackupDB';
+const BACKUP_STORE = 'backups';
+const BACKUP_MAX = 10;
+const LS_LAST_BACKUP = 'wordTrainer.lastBackup.v1';
+
+function openBackupDB(){
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB){ reject(new Error('IndexedDB 不可用')); return; }
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done){ done = true; reject(new Error('IndexedDB 打开超时')); }
+    }, 2000);
+    try {
+      const req = indexedDB.open(BACKUP_DB, 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(BACKUP_STORE)){
+          db.createObjectStore(BACKUP_STORE, { keyPath: 'id', autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => { if (!done){ done = true; clearTimeout(timer); resolve(req.result); } };
+      req.onerror = () => { if (!done){ done = true; clearTimeout(timer); reject(req.error); } };
+    } catch(e){
+      if (!done){ done = true; clearTimeout(timer); reject(e); }
+    }
+  });
+}
+async function backupSave(data){
+  try {
+    const db = await openBackupDB();
+    const tx = db.transaction(BACKUP_STORE, 'readwrite');
+    const store = tx.objectStore(BACKUP_STORE);
+    await new Promise((res, rej) => {
+      const req = store.add({ timestamp: Date.now(), payload: JSON.stringify(data) });
+      req.onsuccess = () => res();
+      req.onerror = () => rej(req.error);
+    });
+    const all = await new Promise((res, rej) => {
+      const r = store.getAll();
+      r.onsuccess = () => res(r.result || []);
+      r.onerror = () => rej(r.error);
+    });
+    if (all.length > BACKUP_MAX){
+      all.sort((a, b) => a.timestamp - b.timestamp);
+      const toDelete = all.slice(0, all.length - BACKUP_MAX);
+      for (const item of toDelete){
+        await new Promise(res => {
+          const r = store.delete(item.id);
+          r.onsuccess = () => res();
+          r.onerror = () => res();
+        });
+      }
+    }
+    localStorage.setItem(LS_LAST_BACKUP, Date.now().toString());
+    return true;
+  } catch(e){
+    console.warn('备份失败：', e);
+    return false;
+  }
+}
+async function backupLoadLatest(){
+  try {
+    const db = await openBackupDB();
+    const tx = db.transaction(BACKUP_STORE, 'readonly');
+    const store = tx.objectStore(BACKUP_STORE);
+    const all = await new Promise((res, rej) => {
+      const r = store.getAll();
+      r.onsuccess = () => res(r.result || []);
+      r.onerror = () => rej(r.error);
+    });
+    if (!all.length) return null;
+    all.sort((a, b) => b.timestamp - a.timestamp);
+    return { timestamp: all[0].timestamp, data: JSON.parse(all[0].payload) };
+  } catch(e){
+    return null;
+  }
+}
+function downloadJSON(data, filename){
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+function renderBackupStatus(){
+  const el = $('#backupStatus');
+  if (!el) return;
+  const last = parseInt(localStorage.getItem(LS_LAST_BACKUP) || '0', 10);
+  if (!last){
+    el.className = 'backup-status warn';
+    el.textContent = '尚未建立备份，建议点击右侧「立即备份」';
+    return;
+  }
+  const diff = Date.now() - last;
+  el.className = 'backup-status ok';
+  if (diff < 3600000) el.textContent = '✅ 已自动备份 · ' + formatTime(last);
+  else if (diff < 86400000) el.textContent = '✅ 上次备份：' + formatTime(last);
+  else {
+    el.className = 'backup-status warn';
+    el.textContent = '⚠️ 上次备份较早：' + formatTime(last) + '，建议重新备份';
+  }
+}
+
+/* ===================== SheetJS 本地加载 ===================== */
+const SHEETJS_SOURCES = ['./lib/xlsx.full.min.js'];
+let sheetjsLoading = null;
+function loadSheetJS(){
+  if (typeof XLSX !== 'undefined') return Promise.resolve(true);
+  if (sheetjsLoading) return sheetjsLoading;
+  sheetjsLoading = new Promise((resolve, reject) => {
+    let idx = 0;
+    const tryNext = () => {
+      if (idx >= SHEETJS_SOURCES.length){
+        sheetjsLoading = null;
+        reject(new Error('Excel 引擎未找到，请确认 lib/xlsx.full.min.js 存在'));
+        return;
+      }
+      const src = SHEETJS_SOURCES[idx++];
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = () => { typeof XLSX !== 'undefined' ? resolve(true) : tryNext(); };
+      s.onerror = () => { s.remove(); tryNext(); };
+      document.head.appendChild(s);
+    };
+    tryNext();
+  });
+  return sheetjsLoading;
+}
+
+/* ===================== 导出分组 ===================== */
+const EXPORT_GROUP_SIZE = 20;
+function buildGroupedExportList(selectedCat){
+  let pool = words.filter(x => x && x.w);
+  if (selectedCat !== ALL_CAT){
+    pool = pool.filter(x => (x.cat || DEFAULT_CAT) === selectedCat);
+  }
+  const groupMap = new Map();
+  const order = [];
+  pool.forEach(w => {
+    const cat = w.cat || DEFAULT_CAT;
+    if (!groupMap.has(cat)){ groupMap.set(cat, []); order.push(cat); }
+    groupMap.get(cat).push(w);
+  });
+  const out = [];
+  order.forEach(cat => {
+    const arr = groupMap.get(cat);
+    if (arr.length <= EXPORT_GROUP_SIZE){
+      arr.forEach(w => out.push({ w: w.w, d: w.d || '', exportCat: cat }));
+    } else {
+      for (let i = 0; i < arr.length; i += EXPORT_GROUP_SIZE){
+        const chunk = arr.slice(i, i + EXPORT_GROUP_SIZE);
+        const groupIdx = Math.floor(i / EXPORT_GROUP_SIZE) + 1;
+        const suffix = String(groupIdx).padStart(2, '0');
+        const newCat = cat + suffix;
+        chunk.forEach(w => out.push({ w: w.w, d: w.d || '', exportCat: newCat }));
+      }
+    }
+  });
+  return out;
+}
+
+/* ===================== Excel 模板下载 ===================== */
+async function downloadTemplate(){
+  playSound('click');
+  try { await loadSheetJS(); }
+  catch(e){
+    playSound('error');
+    toast('Excel 引擎未加载，请确认 lib/xlsx.full.min.js 存在', 'err');
+    return;
+  }
+  try {
+    const wb = XLSX.utils.book_new();
+    const header = ['英文', '中文', '类型'];
+    const rows = [header];
+    for (let i = 0; i < 30; i++) rows.push(['', '', '']);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 22 }, { wch: 34 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws, '单词表');
+
+    const info = [
+      ['单词听默器 · Excel 导入模板 · 填写说明'],
+      [''],
+      ['【字段说明】'],
+      ['英文', '必填。填英文单词或词块。单词如 apple，词块如 take off'],
+      ['中文', '建议填。中文释义，如 苹果、起飞'],
+      ['类型', '单词可选填（如 水果/动物/动作/情绪 等）。词块请留空，系统会自动归入「短语」'],
+      [''],
+      ['【示例】'],
+      ['英文', '中文', '类型'],
+      ['apple', '苹果', '水果'],
+      ['banana', '香蕉', '水果'],
+      ['happy', '快乐的', '情绪'],
+      ['take off', '起飞', ''],
+      ['look after', '照顾', ''],
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(info);
+    ws2['!cols'] = [{ wch: 14 }, { wch: 66 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws2, '填写说明');
+
+    XLSX.writeFile(wb, '单词听默器导入模板.xlsx');
+    playSound('excel');
+    toast('模板已下载，用 Excel 或 Numbers 打开填写', 'ok');
+  } catch(e){
+    console.error(e);
+    playSound('error');
+    toast('下载失败：' + (e.message || '未知错误'), 'err');
+  }
+}
+
+/* ===================== 导出为 Excel ===================== */
+async function exportToExcel(){
+  playSound('click');
+  if (!words.length){ playSound('error'); return toast('词库为空，无法导出', 'err'); }
+  try { await loadSheetJS(); }
+  catch(e){
+    playSound('error');
+    toast('Excel 引擎未加载，请确认 lib/xlsx.full.min.js 存在', 'err');
+    return;
+  }
+  try {
+    const selCat = $('#excelExportCat').value;
+    const list = buildGroupedExportList(selCat);
+    if (!list.length){
+      playSound('error');
+      return toast('没有可导出的单词', 'err');
+    }
+    const wb = XLSX.utils.book_new();
+    const rows = [['英文', '中文', '类型']];
+    list.forEach(x => rows.push([x.w, x.d || '', x.exportCat]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 22 }, { wch: 34 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws, '单词表');
+    const ts = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const suffix = ts.getFullYear() + pad(ts.getMonth()+1) + pad(ts.getDate())
+                 + '_' + pad(ts.getHours()) + pad(ts.getMinutes());
+    const catLabel = selCat === ALL_CAT ? '全部' : selCat.replace(/[\\/:*?"<>|]/g, '_');
+    XLSX.writeFile(wb, `单词听默器导出_${catLabel}_${suffix}.xlsx`);
+    playSound('excel');
+    toast(`已导出 ${list.length} 个单词`, 'ok');
+  } catch(e){
+    console.error(e);
+    playSound('error');
+    toast('导出失败：' + (e.message || '未知错误'), 'err');
+  }
+}
+
+/* ===================== Excel 上传解析 ===================== */
+async function handleExcelUpload(file){
+  if (!file) return;
+  const fileName = (file.name || '').toLowerCase();
+  const isCSV = fileName.endsWith('.csv');
+  if (isCSV){
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        let text = String(ev.target.result || '');
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        const lines = text.split(/\r?\n/);
+        const out = []; let skipped = 0;
+        for (let i = 1; i < lines.length; i++){
+          const line = lines[i];
+          if (!line.trim()) continue;
+          const cols = parseCSVLine(line);
+          const w = (cols[0] || '').trim();
+          const d = (cols[1] || '').trim();
+          const c = (cols[2] || '').trim();
+          if (!w) continue;
+          const we = validateWordOnly(w);
+          if (we){ skipped++; continue; }
+          let l = w;
+          if (d || c) l += ' | ' + d;
+          if (c) l += ' | ' + c;
+          out.push(l);
+        }
+        applyExcelImport(out, skipped);
+      } catch(err){
+        console.error(err);
+        playSound('error');
+        toast('解析 CSV 失败：' + (err.message || '文件格式不正确'), 'err');
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    return;
+  }
+  try { await loadSheetJS(); }
+  catch(e){
+    playSound('error');
+    toast('Excel 引擎未加载，请确认 lib/xlsx.full.min.js 存在', 'err');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      if (!ws){
+        playSound('error');
+        return toast('Excel 中没有找到工作表', 'err');
+      }
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const out = []; let skipped = 0;
+      for (let i = 1; i < rows.length; i++){
+        const r = rows[i];
+        if (!r) continue;
+        const w = String(r[0] || '').trim();
+        const d = String(r[1] || '').trim();
+        const c = String(r[2] || '').trim();
+        if (!w) continue;
+        const we = validateWordOnly(w);
+        if (we){ skipped++; continue; }
+        let l = w;
+        if (d || c) l += ' | ' + d;
+        if (c) l += ' | ' + c;
+        out.push(l);
+      }
+      applyExcelImport(out, skipped);
+    } catch(err){
+      console.error(err);
+      playSound('error');
+      toast('解析 Excel 失败：' + (err.message || '文件格式不正确'), 'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function applyExcelImport(lines, skipped){
+  if (!lines.length){
+    playSound('error');
+    toast('没有解析到有效数据，请检查是否从第 2 行开始填写', 'err');
+    return;
+  }
+  const cur = $('#bulk').value.trim();
+  $('#bulk').value = (cur ? cur + '\n' : '') + lines.join('\n');
+  updateBulkStatus();
+  playSound('match');
+
+  const parsed = parseInput(lines.join('\n'));
+  const unknownWords = parsed
+    .filter(p => p.w && !DICT[p.w.toLowerCase()] && !EMOJI_MAP_NORM[p.w.toLowerCase()])
+    .map(p => p.w);
+
+  let msg = `✓ 已解析 ${lines.length} 行`;
+  if (skipped) msg += `，跳过 ${skipped} 行无效数据`;
+
+  if (unknownWords.length){
+    msg += `\n\n⚠️ 拼写检查：以下 ${unknownWords.length} 个单词不在内置词典中，请确认拼写：\n` +
+      unknownWords.slice(0, 12).join('、') +
+      (unknownWords.length > 12 ? ` 等 ${unknownWords.length} 个` : '');
+    toast(msg, 'err');
+    playSound('error');
+  } else {
+    toast(msg, 'ok');
+    playSound('match');
+  }
+}
+function parseCSVLine(line){
+  const out = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (inQ){
+      if (ch === '"'){ if (line[i+1] === '"'){ cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else {
+      if (ch === ','){ out.push(cur); cur = ''; }
+      else if (ch === '"'){ inQ = true; }
+      else cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+/* ==========================================================
+   📝 生成英语单词默写纸（支持多选分类）
+   ========================================================== */
+const DICTATION_CN_NUM = ['一','二','三','四','五','六','七','八','九','十',
+                          '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
+                          '二十一','二十二','二十三','二十四','二十五','二十六','二十七','二十八',
+                          '二十九','三十'];
+
+/** 已勾选的默写纸分类（空集合表示「全部分类」） */
+let dictationCats = new Set();
+
+function renderDictationCatPicker(){
+  const list = $('#dictationCatList');
+  if (!list) return;
+  // 清理已被删除的分类
+  [...dictationCats].forEach(c => { if (!cats.includes(c)) dictationCats.delete(c); });
+  list.innerHTML = cats.map(c => `
+    <label class="ms-item">
+      <input type="checkbox" value="${escapeHtml(c)}" ${dictationCats.has(c) ? 'checked' : ''}>
+      <span>${escapeHtml(c)}</span>
+    </label>`).join('');
+  updateDictationCatBtn();
+}
+function updateDictationCatBtn(){
+  const btn = $('#dictationCatBtn');
+  if (!btn) return;
+  if (!dictationCats.size){
+    btn.textContent = '全部分类 ▾';
+    btn.title = '未勾选表示导出全部分类';
+  } else if (dictationCats.size <= 2){
+    btn.textContent = [...dictationCats].join('、') + ' ▾';
+    btn.title = [...dictationCats].join('、');
+  } else {
+    btn.textContent = `已选 ${dictationCats.size} 个分类 ▾`;
+    btn.title = [...dictationCats].join('、');
+  }
+}
+function closeDictationPop(){
+  const pop = $('#dictationCatPop');
+  if (pop) pop.hidden = true;
+}
+
+/** 生成一个四线格的 HTML（用真实 border 绘制，打印可见） */
+function fourLineHtml(){
+  return `<div class="four-line">
+    <span class="fl fl1"></span>
+    <span class="fl fl2"></span>
+    <span class="fl fl3"></span>
+    <span class="fl fl4"></span>
+  </div>`;
+}
+
+function exportDictationPaper(){
+  playSound('click');
+  if (!words.length){ playSound('error'); return toast('词库为空，无法导出默写纸', 'err'); }
+
+  const selCats = dictationCats.size ? new Set(dictationCats) : null;
+  let pool = words.filter(x => x && x.w && (x.d || ''));
+  if (selCats) pool = pool.filter(x => selCats.has(x.cat || DEFAULT_CAT));
+  if (!pool.length){
+    playSound('error');
+    return toast('没有可导出的单词（需要有中文释义）', 'err');
+  }
+
+  // 先按类型分组
+  const catMap = new Map();
+  const catAppear = [];
+  pool.forEach(w => {
+    const cat = w.cat || DEFAULT_CAT;
+    if (!catMap.has(cat)){ catMap.set(cat, []); catAppear.push(cat); }
+    catMap.get(cat).push(w);
+  });
+  // 按 cats 的顺序排列分类
+  const ordered = [];
+  cats.forEach(c => { if (catMap.has(c)) ordered.push(c); });
+  catAppear.forEach(c => { if (!ordered.includes(c)) ordered.push(c); });
+
+  // 每个类型生成若干行，每行 3 个
+  let bodyHtml = '';
+  ordered.forEach((cat, idx) => {
+    const num = idx < DICTATION_CN_NUM.length ? DICTATION_CN_NUM[idx] : String(idx + 1);
+    const list = catMap.get(cat);
+
+    const rows = [];
+    for (let i = 0; i < list.length; i += 3){
+      rows.push(list.slice(i, i + 3));
+    }
+
+    bodyHtml += `<section class="dp-category">`;
+    bodyHtml += `<h2 class="dp-cat-title">${num}、${escapeHtml(cat)}</h2>`;
+    rows.forEach(row => {
+      bodyHtml += `<div class="dp-row">`;
+      for (let i = 0; i < 3; i++){
+        const w = row[i];
+        if (w){
+          bodyHtml += `<div class="dp-cell">
+            <div class="dp-zh">${escapeHtml(w.d || '')}</div>
+            ${fourLineHtml()}
+          </div>`;
+        } else {
+          bodyHtml += `<div class="dp-cell dp-empty"></div>`;
+        }
+      }
+      bodyHtml += `</div>`;
+    });
+    bodyHtml += `</section>`;
+  });
+
+  const paperHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>英语单词默写纸</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+       color:#1f2937;background:#eef2f9}
+  .toolbar{background:#fff;padding:12px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08);
+           position:sticky;top:0;z-index:100;display:flex;gap:10px;align-items:center;
+           flex-wrap:wrap}
+  .toolbar button{padding:10px 18px;border:0;border-radius:10px;background:#4f7cff;
+                  color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+  .toolbar button.ghost{background:#eef2ff;color:#3f5fd6}
+  .toolbar .tip{color:#6b7280;font-size:13px}
+  .paper{background:#fff;width:210mm;min-height:297mm;margin:20px auto;
+         padding:12mm 12mm 12mm 12mm;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+  .dp-title{text-align:center;font-size:22px;font-weight:700;margin-bottom:12px;
+            letter-spacing:3px;color:#111}
+  .dp-info{display:flex;justify-content:space-between;font-size:14px;
+           margin-bottom:14px;flex-wrap:wrap;gap:12px;color:#111}
+  .dp-info span{white-space:nowrap}
+  .dp-line{display:inline-block;width:66px;border-bottom:1px solid #333}
+  .dp-instruction{text-align:center;font-size:13px;color:#4b5563;
+                  margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
+  .dp-category{margin-bottom:14px}
+  .dp-cat-title{font-size:15px;font-weight:700;color:#1d4ed8;margin-bottom:10px;
+                padding-bottom:4px;border-bottom:1px dashed #cbd5e1;
+                break-after:avoid;page-break-after:avoid;
+                break-inside:avoid;page-break-inside:avoid}
+
+  .dp-row{display:grid;grid-template-columns:repeat(3,1fr);
+          gap:10px 14px;margin-bottom:12px;
+          break-inside:avoid;page-break-inside:avoid}
+  .dp-cell{display:flex;flex-direction:column;gap:4px;min-width:0;
+           break-inside:avoid;page-break-inside:avoid}
+  .dp-empty{visibility:hidden}
+
+  .dp-zh{font-size:13px;color:#374151;line-height:1.3;text-align:center;
+         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+
+  .four-line{position:relative;width:100%;height:36px}
+  .fl{position:absolute;left:0;right:0;height:0;
+      border-top-width:1px;border-top-style:solid}
+  .fl1{top:0;border-top-color:#94a3b8}
+  .fl2{top:12px;border-top-color:#cbd5e1}
+  .fl3{top:24px;border-top-color:#ef4444}
+  .fl4{top:35px;border-top-color:#94a3b8}
+
+  @media print{
+    body{background:#fff}
+    .toolbar{display:none}
+    .paper{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}
+    @page{size:A4;margin:12mm}
+    .dp-category{break-inside:auto;page-break-inside:auto}
+    .dp-cat-title{break-after:avoid;page-break-after:avoid}
+    .dp-row{break-inside:avoid;page-break-inside:avoid}
+    .dp-cell{break-inside:avoid;page-break-inside:avoid}
+    .fl{border-top-width:1px !important;border-top-style:solid !important}
+    .fl1,.fl4{border-top-color:#94a3b8 !important}
+    .fl2{border-top-color:#cbd5e1 !important}
+    .fl3{border-top-color:#ef4444 !important}
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">🖨️ 打印 / 保存为 PDF</button>
+    <button class="ghost" onclick="window.close()">关闭</button>
+    <span class="tip">打印时请选择 A4 纸张，边距选「默认」</span>
+  </div>
+  <div class="paper">
+    <h1 class="dp-title">英语单词默写纸</h1>
+    <div class="dp-info">
+      <span>姓名：<span class="dp-line"></span></span>
+      <span>班级：<span class="dp-line"></span></span>
+      <span>日期：<span class="dp-line"></span></span>
+      <span>得分：<span class="dp-line"></span></span>
+    </div>
+    <div class="dp-instruction">请在四线格上写出下列中文对应的英文单词</div>
+    ${bodyHtml}
+  </div>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (!w){
+    playSound('error');
+    return toast('浏览器拦截了弹窗，请允许弹窗后重试', 'err');
+  }
+  w.document.open();
+  w.document.write(paperHtml);
+  w.document.close();
+  playSound('save');
+  toast('默写纸已生成，可在新窗口打印或存为 PDF', 'ok');
+}
+
+/* ===================== 音标表 ===================== */
+const PHONETIC_MAP = {
+  apple:'/ˈæp.əl/', banana:'/bəˈnæn.ə/', orange:'/ˈɔːr.ɪndʒ/', grape:'/ɡreɪp/',
+  watermelon:'/ˈwɔː.t̬ɚ.mel.ən/', strawberry:'/ˈstrɑː.bɚ.i/', peach:'/piːtʃ/',
+  lemon:'/ˈlem.ən/', cherry:'/ˈtʃer.i/', mango:'/ˈmæŋ.ɡoʊ/', pineapple:'/ˈpaɪn.æp.əl/',
+  pear:'/per/', carrot:'/ˈker.ət/', potato:'/pəˈteɪ.t̬oʊ/', tomato:'/təˈmeɪ.t̬oʊ/',
+  corn:'/kɔːrn/', broccoli:'/ˈbrɑː.kəl.i/', cucumber:'/ˈkjuː.kʌm.bɚ/',
+  onion:'/ˈʌn.jən/', mushroom:'/ˈmʌʃ.ruːm/', pepper:'/ˈpep.ɚ/',
+  dog:'/dɑːɡ/', cat:'/kæt/', rabbit:'/ˈræb.ɪt/', panda:'/ˈpæn.də/',
+  tiger:'/ˈtaɪ.ɡɚ/', lion:'/ˈlaɪ.ən/', elephant:'/ˈel.ə.fənt/', monkey:'/ˈmʌŋ.ki/',
+  horse:'/hɔːrs/', bird:'/bɝːd/', penguin:'/ˈpeŋ.ɡwɪn/', butterfly:'/ˈbʌt̬.ɚ.flaɪ/',
+  fish:'/fɪʃ/', dolphin:'/ˈdɑːl.fɪn/', snake:'/sneɪk/', frog:'/frɑːɡ/',
+  bread:'/bred/', cake:'/keɪk/', egg:'/eɡ/', milk:'/mɪlk/',
+  coffee:'/ˈkɑː.fi/', tea:'/tiː/', rice:'/raɪs/', noodle:'/ˈnuː.dəl/',
+  chocolate:'/ˈtʃɑːk.lət/', hamburger:'/ˈhæm.bɝː.ɡɚ/', pizza:'/ˈpiːt.sə/',
+  honey:'/ˈhʌn.i/', water:'/ˈwɑː.t̬ɚ/',
+  sun:'/sʌn/', moon:'/muːn/', star:'/stɑːr/', rain:'/reɪn/', snow:'/snoʊ/',
+  rainbow:'/ˈreɪn.boʊ/', fire:'/ˈfaɪ.ɚ/', tree:'/triː/', flower:'/ˈflaʊ.ɚ/',
+  mountain:'/ˈmaʊn.t̬ən/', sea:'/siː/', beach:'/biːtʃ/', forest:'/ˈfɔːr.ɪst/',
+  earth:'/ɝːθ/', wind:'/wɪnd/',
+  car:'/kɑːr/', bus:'/bʌs/', train:'/treɪn/', airplane:'/ˈer.pleɪn/',
+  ship:'/ʃɪp/', bike:'/baɪk/', taxi:'/ˈtæk.si/', rocket:'/ˈrɑː.kɪt/', subway:'/ˈsʌb.weɪ/',
+  book:'/bʊk/', pen:'/pen/', pencil:'/ˈpen.səl/', phone:'/foʊn/',
+  computer:'/kəmˈpjuː.t̬ɚ/', camera:'/ˈkæm.rə/', clock:'/klɑːk/', key:'/kiː/',
+  gift:'/ɡɪft/', money:'/ˈmʌn.i/', umbrella:'/ʌmˈbrel.ə/', glasses:'/ˈɡlæs.ɪz/',
+  hat:'/hæt/', shoe:'/ʃuː/', bag:'/bæɡ/', door:'/dɔːr/', window:'/ˈwɪn.doʊ/',
+  house:'/haʊs/', letter:'/ˈlet̬.ɚ/', map:'/mæp/', ticket:'/ˈtɪk.ɪt/',
+  robot:'/ˈroʊ.bɑːt/', trophy:'/ˈtroʊ.fi/', ball:'/bɔːl/',
+  guitar:'/ɡɪˈtɑːr/', piano:'/piˈæn.oʊ/',
+  baby:'/ˈbeɪ.bi/', teacher:'/ˈtiː.tʃɚ/', doctor:'/ˈdɑːk.tɚ/', student:'/ˈstuː.dənt/',
+  friend:'/frend/', family:'/ˈfæm.əl.i/',
+  happy:'/ˈhæp.i/', sad:'/sæd/', angry:'/ˈæŋ.ɡri/', tired:'/ˈtaɪrd/',
+  excited:'/ɪkˈsaɪ.t̬ɪd/', surprised:'/sɚˈpraɪzd/',
+  run:'/rʌn/', walk:'/wɑːk/', jump:'/dʒʌmp/', swim:'/swɪm/', dance:'/dæns/',
+  sing:'/sɪŋ/', sleep:'/sliːp/', eat:'/iːt/', drink:'/drɪŋk/', read:'/riːd/',
+  write:'/raɪt/', draw:'/drɔː/', laugh:'/læf/', cry:'/kraɪ/', think:'/θɪŋk/',
+  study:'/ˈstʌd.i/', work:'/wɝːk/', play:'/pleɪ/', travel:'/ˈtræv.əl/', help:'/help/',
+  big:'/bɪɡ/', small:'/smɔːl/', hot:'/hɑːt/', cold:'/koʊld/', fast:'/fæst/',
+  slow:'/sloʊ/', new:'/nuː/', old:'/oʊld/', beautiful:'/ˈbjuː.t̬ə.fəl/',
+  strong:'/strɑːŋ/', easy:'/ˈiː.zi/', difficult:'/ˈdɪf.ɪ.kəlt/',
+  clean:'/kliːn/', dirty:'/ˈdɝː.t̬i/',
+  school:'/skuːl/', library:'/ˈlaɪ.brer.i/', hospital:'/ˈhɑː.spɪ.t̬əl/',
+  park:'/pɑːrk/', home:'/hoʊm/', city:'/ˈsɪt̬.i/', world:'/wɝːld/',
+  morning:'/ˈmɔːr.nɪŋ/', afternoon:'/ˌæf.tɚˈnuːn/', evening:'/ˈiːv.nɪŋ/', night:'/naɪt/',
+  today:'/təˈdeɪ/', tomorrow:'/təˈmɑːr.oʊ/', yesterday:'/ˈjes.tɚ.deɪ/',
+  week:'/wiːk/', month:'/mʌnθ/', year:'/jɪr/', birthday:'/ˈbɝːθ.deɪ/',
+  holiday:'/ˈhɑː.lə.deɪ/', summer:'/ˈsʌm.ɚ/', winter:'/ˈwɪn.t̬ɚ/',
+  spring:'/sprɪŋ/', autumn:'/ˈɑː.t̬əm/', weather:'/ˈweð.ɚ/',
+  sunny:'/ˈsʌn.i/', cloudy:'/ˈklaʊ.di/', rainy:'/ˈreɪ.ni/', snowy:'/ˈsnoʊ.i/', windy:'/ˈwɪn.di/',
+  love:'/lʌv/', dream:'/driːm/', idea:'/aɪˈdiː.ə/', question:'/ˈkwes.tʃən/',
+  answer:'/ˈæn.sɚ/', problem:'/ˈprɑː.bləm/', mistake:'/mɪˈsteɪk/', story:'/ˈstɔːr.i/',
+  news:'/nuːz/', message:'/ˈmes.ɪdʒ/', email:'/ˈiː.meɪl/', photo:'/ˈfoʊ.t̬oʊ/',
+  picture:'/ˈpɪk.tʃɚ/', video:'/ˈvɪd.i.oʊ/', game:'/ɡeɪm/', song:'/sɔːŋ/',
+  movie:'/ˈmuː.vi/', party:'/ˈpɑːr.t̬i/', festival:'/ˈfes.tə.vəl/', wedding:'/ˈwed.ɪŋ/'
+};
+const PHONETIC_MAP_NORM = {};
+Object.keys(PHONETIC_MAP).forEach(k => { PHONETIC_MAP_NORM[k.toLowerCase()] = PHONETIC_MAP[k]; });
+
+/* ===================== 配图库（重新整理 · 分类准确） ===================== */
+const EMOJI_MAP = {
+  /* 水果 */
+  apple:'🍎', banana:'🍌', orange:'🍊', grape:'🍇', watermelon:'🍉', strawberry:'🍓',
+  peach:'🍑', lemon:'🍋', cherry:'🍒', mango:'🥭', pineapple:'🍍', pear:'🍐',
+  kiwi:'🥝', coconut:'🥥', blueberry:'🫐', melon:'🍈', lime:'🍋', plum:'🍑',
+  /* 蔬菜 */
+  carrot:'🥕', potato:'🥔', tomato:'🍅', corn:'🌽', broccoli:'🥦', cucumber:'🥒',
+  onion:'🧅', mushroom:'🍄', pepper:'🌶️', garlic:'🧄', cabbage:'🥬', lettuce:'🥬',
+  pumpkin:'🎃', eggplant:'🍆', pea:'🫛', bean:'🫘', ginger:'🫚', celery:'🥬',
+  /* 动物 */
+  dog:'🐶', puppy:'🐶', cat:'🐱', kitten:'🐱', rabbit:'🐰', panda:'🐼', tiger:'🐯',
+  lion:'🦁', elephant:'🐘', monkey:'🐵', horse:'🐴', bird:'🐦', penguin:'🐧',
+  butterfly:'🦋', fish:'🐟', dolphin:'🐬', snake:'🐍', frog:'🐸', duck:'🦆',
+  chicken:'🐔', pig:'🐷', cow:'🐮', sheep:'🐑', goat:'🐐', mouse:'🐭', bear:'🐻',
+  wolf:'🐺', fox:'🦊', deer:'🦌', giraffe:'🦒', zebra:'🦓', kangaroo:'🦘',
+  koala:'🐨', camel:'🐫', turtle:'🐢', whale:'🐳', shark:'🦈', crab:'🦀',
+  octopus:'🐙', bee:'🐝', ant:'🐜', spider:'🕷️', owl:'🦉', eagle:'🦅',
+  parrot:'🦜', swan:'🦢', peacock:'🦚', turkey:'🦃', squirrel:'🐿️', hedgehog:'🦔',
+  bat:'🦇', dragon:'🐉', dinosaur:'🦕', unicorn:'🦄', hamster:'🐹', lizard:'🦎',
+  crocodile:'🐊', worm:'🪱', snail:'🐌', seal:'🦭', otter:'🦦',
+  /* 食物 */
+  bread:'🍞', cake:'🍰', egg:'🥚', milk:'🥛', coffee:'☕', tea:'🍵', rice:'🍚',
+  noodle:'🍜', chocolate:'🍫', hamburger:'🍔', pizza:'🍕', honey:'🍯', water:'💧',
+  juice:'🧃', cookie:'🍪', biscuit:'🍪', donut:'🍩', candy:'🍬', ice_cream:'🍦',
+  sandwich:'🥪', salad:'🥗', soup:'🍲', cheese:'🧀', butter:'🧈', pancake:'🥞',
+  popcorn:'🍿', sushi:'🍣', dumpling:'🥟', hotdog:'🌭', taco:'🌮', fries:'🍟',
+  yogurt:'🥛', sugar:'🍬', salt:'🧂', meat:'🥩', steak:'🥩', bacon:'🥓',
+  breakfast:'🍳', lunch:'🍱', dinner:'🍽️', dessert:'🍮', snack:'🍿', food:'🍽️',
+  /* 自然 */
+  sun:'☀️', moon:'🌙', star:'⭐', rain:'🌧️', snow:'❄️', rainbow:'🌈', fire:'🔥',
+  tree:'🌳', flower:'🌸', mountain:'⛰️', sea:'🌊', beach:'🏖️', forest:'🌲',
+  earth:'🌍', wind:'💨', cloud:'☁️', sky:'🌌', river:'🏞️', lake:'🏞️', island:'🏝️',
+  desert:'🏜️', volcano:'🌋', grass:'🌱', leaf:'🍃', seed:'🌰', rose:'🌹',
+  tulip:'🌷', sunflower:'🌻', cactus:'🌵', bamboo:'🎋', lightning:'⚡',
+  storm:'⛈️', thunder:'⛈️', fog:'🌫️', ice:'🧊', wave:'🌊', sunset:'🌅', sunrise:'🌄',
+  /* 交通 */
+  car:'🚗', bus:'🚌', train:'🚆', airplane:'✈️', plane:'✈️', ship:'🚢', bike:'🚲',
+  bicycle:'🚲', taxi:'🚕', rocket:'🚀', subway:'🚇', metro:'🚇', truck:'🚚',
+  ambulance:'🚑', police_car:'🚓', fire_truck:'🚒', motorcycle:'🏍️', boat:'⛵',
+  helicopter:'🚁', tractor:'🚜', scooter:'🛵', traffic:'🚦',
+  /* 物品 */
+  book:'📚', pen:'🖊️', pencil:'✏️', phone:'📱', mobile:'📱', computer:'💻',
+  camera:'📷', clock:'⏰', watch:'⌚', key:'🔑', gift:'🎁', present:'🎁',
+  money:'💰', umbrella:'☂️', glasses:'👓', hat:'👒', cap:'🧢', shoe:'👟',
+  sneaker:'👟', boot:'🥾', sock:'🧦', glove:'🧤', scarf:'🧣', coat:'🧥',
+  dress:'👗', skirt:'👗', shirt:'👕', pants:'👖', jeans:'👖', shorts:'🩳',
+  uniform:'🥻', swimsuit:'🩱', bag:'👜', backpack:'🎒', wallet:'👛', purse:'👛',
+  door:'🚪', window:'🪟', house:'🏠', letter:'✉️', email_icon:'📧', map:'🗺️',
+  ticket:'🎫', robot:'🤖', trophy:'🏆', ball:'⚽', guitar:'🎸', piano:'🎹',
+  violin:'🎻', drum:'🥁', trumpet:'🎺', headphones:'🎧', radio:'📻', television:'📺',
+  tv:'📺', laptop:'💻', keyboard:'⌨️', printer:'🖨️', ring:'💍', crown:'👑',
+  mirror:'🪞', brush:'🪥', toothbrush:'🪥', soap:'🧼', towel:'🧺', basket:'🧺',
+  box:'📦', bottle:'🍼', cup:'🥤', glass:'🥛', plate:'🍽️', bowl:'🥣',
+  spoon:'🥄', fork:'🍴', knife:'🔪', scissors:'✂️', hammer:'🔨', ladder:'🪜',
+  rope:'🪢', bucket:'🪣', needle:'🪡', thread:'🧵', button:'🔘', balloon:'🎈',
+  kite:'🪁', toy:'🧸', doll:'🪆', puzzle:'🧩', dice:'🎲', chess:'♟️',
+  basketball:'🏀', football:'⚽', soccer:'⚽', baseball:'⚾', tennis:'🎾',
+  volleyball:'🏐', badminton:'🏸', ping_pong:'🏓', golf:'⛳', medal:'🏅',
+  flag:'🚩', candle:'🕯️', lamp:'💡', light:'💡', bulb:'💡', battery:'🔋',
+  plug:'🔌', magnet:'🧲', telescope:'🔭', microscope:'🔬', thermometer:'🌡️',
+  syringe:'💉', pill:'💊', bandage:'🩹', stethoscope:'🩺', coin:'🪙',
+  credit_card:'💳', envelope:'✉️', notebook:'📓', diary:'📔', dictionary:'📖',
+  magazine:'📰', newspaper:'📰', ruler:'📏', eraser:'🧽', crayon:'🖍️', glue:'🧴',
+  /* 人物 */
+  baby:'👶', teacher:'👩‍🏫', doctor:'👨‍⚕️', nurse:'👩‍⚕️', student:'🎓',
+  friend:'🤝', family:'👨‍👩‍👧', father:'👨', mother:'👩', dad:'👨', mom:'👩',
+  brother:'👦', sister:'👧', grandfather:'👴', grandma:'👵', grandmother:'👵',
+  grandpa:'👴', uncle:'👨', aunt:'👩', cousin:'🧑', son:'👦', daughter:'👧',
+  boy:'👦', girl:'👧', man:'👨', woman:'👩', policeman:'👮', police:'👮',
+  firefighter:'👨‍🚒', farmer:'👨‍🌾', cook:'👨‍🍳', chef:'👨‍🍳', driver:'🚗',
+  singer:'🎤', dancer:'💃', artist:'🎨', writer:'✍️', scientist:'👨‍🔬',
+  engineer:'👨‍💻', pilot:'👨‍✈️', soldier:'💂', king:'🤴', queen:'👸',
+  prince:'🤴', princess:'👸', hero:'🦸', clown:'🤡', santa:'🎅', people:'👥',
+  /* 情绪 */
+  happy:'😊', sad:'😢', angry:'😠', tired:'😴', excited:'🤩', surprised:'😲',
+  scared:'😨', worried:'😟', nervous:'😰', bored:'😑', confused:'😕', shy:'☺️',
+  proud:'😌', lonely:'😔', hungry:'😋', thirsty:'🥵', sick:'🤒', sleepy:'😴',
+  calm:'😌', funny:'😄', kind:'😊', friendly:'😊', brave:'🦁', lazy:'🦥',
+  /* 动作 */
+  run:'🏃', walk:'🚶', jump:'🤸', swim:'🏊', dance:'💃', sing:'🎤', sleep:'😴',
+  eat:'🍽️', drink:'🥤', read:'📖', write:'✍️', draw:'🎨', paint:'🎨',
+  laugh:'😂', cry:'😭', think:'🤔', smile:'😊', wave:'👋', clap:'👏',
+  hug:'🤗', kiss:'😘', throw:'🤾', catch:'🤲', climb:'🧗', fly:'🕊️',
+  drive:'🚗', ride:'🏇', listen:'👂', speak:'🗣️', talk:'🗣️', see:'👀',
+  look:'👀', watch:'👀', smell:'👃', taste:'👅', touch:'👆', cook:'🍳',
+  wash:'🧼', sweep:'🧹', study:'📚', learn:'📚', teach:'👨‍🏫', play:'🎮',
+  work:'💼', help:'🙋', buy:'🛒', sell:'💰', pay:'💳', wait:'⏳',
+  open:'🔓', close:'🔒', start:'▶️', stop:'⏹️', finish:'✅', begin:'▶️',
+  /* 地点 */
+  school:'🏫', library:'📚', hospital:'🏥', park:'🏞️', home:'🏡', city:'🏙️',
+  world:'🌏', shop:'🏪', store:'🏬', supermarket:'🛒', market:'🏪', bank:'🏦',
+  hotel:'🏨', restaurant:'🍽️', cinema:'🎬', museum:'🏛️', zoo:'🦁', farm:'🚜',
+  garden:'🌷', kitchen:'🍳', bedroom:'🛏️', bathroom:'🛁', living_room:'🛋️',
+  classroom:'🏫', playground:'🛝', office:'🏢', factory:'🏭', station:'🚉',
+  airport:'✈️', port:'⚓', bridge:'🌉', street:'🛣️', road:'🛣️', village:'🏘️',
+  town:'🏘️', country:'🌍', castle:'🏰', temple:'🛕', church:'⛪', tower:'🗼',
+  stadium:'🏟️', gym:'🏋️', pool:'🏊',
+  /* 形容词 */
+  big:'🐘', large:'🐘', huge:'🐘', small:'🐜', little:'🐜', tall:'🦒',
+  short:'📏', long:'📏', wide:'📏', narrow:'📏', hot:'🔥', cold:'🧊',
+  warm:'🌤️', cool:'😎', fast:'⚡', quick:'⚡', slow:'🐢', new:'🆕',
+  old:'🕰️', young:'👶', beautiful:'🌺', pretty:'🌺', ugly:'😖',
+  strong:'💪', weak:'🥀', easy:'👌', difficult:'🧩', hard:'🧱',
+  soft:'🧸', heavy:'🏋️', light:'🪶', clean:'✨', dirty:'🗑️', quiet:'🤫',
+  noisy:'📢', bright:'💡', dark:'🌑', full:'🈵', empty:'🈳', rich:'💰',
+  poor:'🥺', cheap:'🏷️', expensive:'💎', delicious:'😋', sweet:'🍬',
+  sour:'🍋', salty:'🧂', spicy:'🌶️', bitter:'☕', fresh:'🌿', juicy:'🍑',
+  healthy:'💚',
+  /* 时间 */
+  morning:'🌅', afternoon:'🌇', evening:'🌆', night:'🌃', today:'📅',
+  tomorrow:'📆', yesterday:'📆', week:'📅', month:'📅', year:'📅',
+  birthday_date:'🎂', holiday:'🎉', summer:'☀️', winter:'❄️', spring:'🌸',
+  autumn:'🍂', fall:'🍂', weekend:'🎉',
+  /* 天气 */
+  weather:'🌤️', sunny:'☀️', cloudy:'☁️', rainy:'🌧️', snowy:'❄️', windy:'💨',
+  /* 学科 */
+  math:'🔢', english:'🔤', chinese:'📜', science:'🔬', music:'🎵', art:'🎨',
+  history:'📜', geography:'🗺️', physics:'⚛️', chemistry:'🧪', biology:'🧬',
+  /* 抽象概念 */
+  love:'❤️', heart:'❤️', dream:'💭', idea:'💡', question:'❓', answer:'✅',
+  problem:'🧩', mistake:'❌', story:'📖', news:'📰', message:'💬', email:'📧',
+  photo:'📷', picture:'🖼️', video:'🎬', game:'🎮', song:'🎵', movie:'🎬',
+  party:'🎉', festival:'🎊', wedding:'💒', surprise:'🎉', journey:'🧳',
+  trip:'🧳', adventure:'🗺️', memory:'🧠', wish:'🌠', hope:'🌟', secret:'🤫',
+  danger:'⚠️', safety:'🛡️', freedom:'🕊️', peace:'🕊️', power:'⚡',
+  number:'🔢', word:'🔤', language:'🗣️', name:'🏷️', sign:'🪧', rule:'📋',
+  team:'👥', group:'👥', class:'🏫', lesson:'📚', test:'📝', exam:'📝',
+  homework:'📝', job:'💼', business:'💼', company:'🏢', meeting:'🗣️'
+};
+const EMOJI_MAP_NORM = {};
+Object.keys(EMOJI_MAP).forEach(k => {
+  EMOJI_MAP_NORM[k.replace(/_/g, ' ').toLowerCase()] = EMOJI_MAP[k];
+});
+
+/* 具体类别兜底（不使用「形容词 / 其他 / 短语」，避免张冠李戴） */
+const CONCRETE_CAT_EMOJI = {
+  '水果':'🍎','蔬菜':'🥕','动物':'🐾','食物':'🍽️','自然':'🌿','交通':'🚗',
+  '物品':'📦','人物':'🧑','地点':'📍','情绪':'😊','动作':'🏃'
+};
+
+/* ===================== 词块例句表 ===================== */
+const CHUNK_EXAMPLES = {
+  'an apple a day':{en:'An apple a day keeps the doctor away.',zh:'一天一苹果，医生远离我。'},
+  'apple pie':{en:'My mother baked a delicious apple pie.',zh:'我妈妈烤了一个美味的苹果派。'},
+  'apple juice':{en:'I would like a glass of apple juice.',zh:'我想要一杯苹果汁。'},
+  'orange juice':{en:'She drinks orange juice every morning.',zh:'她每天早上喝橙汁。'},
+  'a glass of milk':{en:'Drink a glass of milk before bed.',zh:'睡前喝一杯牛奶。'},
+  'a cup of coffee':{en:'Let us grab a cup of coffee.',zh:'我们去喝杯咖啡吧。'},
+  'green tea':{en:'Green tea is good for your health.',zh:'绿茶对健康有益。'},
+  'a cup of tea':{en:'Would you like a cup of tea?',zh:'你想喝杯茶吗？'},
+  'fried rice':{en:'Fried rice is easy to cook.',zh:'炒饭很容易做。'},
+  'beef noodles':{en:'Beef noodles are popular here.',zh:'牛肉面在这里很受欢迎。'},
+  'walk the dog':{en:'I walk the dog every evening.',zh:'我每天傍晚遛狗。'},
+  'feed the cat':{en:'Do not forget to feed the cat.',zh:'别忘了喂猫。'},
+  'ride a horse':{en:'He learned to ride a horse last summer.',zh:'他去年夏天学会了骑马。'},
+  'go fishing':{en:'We often go fishing on weekends.',zh:'我们周末经常去钓鱼。'},
+  'the sun rises':{en:'The sun rises in the east.',zh:'太阳从东方升起。'},
+  'heavy rain':{en:'The heavy rain lasted all night.',zh:'大雨下了一整晚。'},
+  'heavy snow':{en:'Heavy snow closed the airport.',zh:'大雪导致机场关闭。'},
+  'make a fire':{en:'They made a fire to keep warm.',zh:'他们生火取暖。'},
+  'plant a tree':{en:'We plant a tree every spring.',zh:'我们每年春天种一棵树。'},
+  'climb a mountain':{en:'We plan to climb a mountain this weekend.',zh:'我们打算这周末去爬山。'},
+  'by the sea':{en:'They live by the sea.',zh:'他们住在海边。'},
+  'on the beach':{en:'The kids played on the beach all day.',zh:'孩子们在海滩上玩了一整天。'},
+  'save the earth':{en:'Everyone should help save the earth.',zh:'每个人都应该帮助拯救地球。'},
+  'strong wind':{en:'A strong wind blew all night.',zh:'强风刮了一整夜。'},
+  'drive a car':{en:'He learned to drive a car at 18.',zh:'他18岁学会了开车。'},
+  'by car':{en:'We went there by car.',zh:'我们开车去了那里。'},
+  'take a bus':{en:'I take a bus to work every day.',zh:'我每天坐公交车上班。'},
+  'bus stop':{en:'The bus stop is near my home.',zh:'公交车站离我家很近。'},
+  'by train':{en:'They traveled by train.',zh:'他们乘火车旅行。'},
+  'take a taxi':{en:'Let us take a taxi home.',zh:'我们打车回家吧。'},
+  'take the subway':{en:'He takes the subway to work.',zh:'他坐地铁上班。'},
+  'read a book':{en:'I like to read a book before bed.',zh:'我喜欢睡前读一本书。'},
+  'answer the phone':{en:'Please answer the phone.',zh:'请接电话。'},
+  'take a photo':{en:'Can you take a photo for us?',zh:'你能给我们拍张照吗？'},
+  'a pair of glasses':{en:'He bought a pair of glasses.',zh:'他买了一副眼镜。'},
+  'a pair of shoes':{en:'These shoes are very comfortable.',zh:'这双鞋很舒服。'},
+  'open the door':{en:'Please open the door for me.',zh:'请帮我开门。'},
+  'open the window':{en:'Please open the window.',zh:'请打开窗户。'},
+  'write a letter':{en:'He wrote a letter to his friend.',zh:'他给朋友写了一封信。'},
+  'play the guitar':{en:'He plays the guitar beautifully.',zh:'他吉他弹得很动听。'},
+  'play the piano':{en:'She practices the piano every day.',zh:'她每天练钢琴。'},
+  'see a doctor':{en:'You should see a doctor right away.',zh:'你应该马上看医生。'},
+  'best friend':{en:'She is my best friend.',zh:'她是我最好的朋友。'},
+  'make friends':{en:'It is easy to make friends here.',zh:'在这里很容易交朋友。'},
+  'feel happy':{en:'I feel happy when I see you.',zh:'见到你我很开心。'},
+  'feel sad':{en:'She feels sad about the news.',zh:'她对这个消息感到难过。'},
+  'run fast':{en:'He can run fast.',zh:'他能跑得很快。'},
+  'take a walk':{en:'Let us take a walk in the park.',zh:'我们去公园散步吧。'},
+  'go swimming':{en:'We go swimming every Sunday.',zh:'我们每个周日去游泳。'},
+  'sing a song':{en:'She sang a beautiful song.',zh:'她唱了一首动听的歌。'},
+  'go to sleep':{en:'The baby went to sleep quickly.',zh:'宝宝很快睡着了。'},
+  'eat breakfast':{en:'I eat breakfast at seven.',zh:'我七点吃早餐。'},
+  'study hard':{en:'You should study hard.',zh:'你应该努力学习。'},
+  'go to work':{en:'She goes to work by bus.',zh:'她坐公交车上班。'},
+  'hard work':{en:'Hard work pays off.',zh:'努力会有回报。'},
+  'play football':{en:'They play football after school.',zh:'他们放学后踢足球。'},
+  'go to school':{en:'The children go to school by bus.',zh:'孩子们坐公交车上学。'},
+  'at home':{en:'I stayed at home all day.',zh:'我一整天都待在家里。'},
+  'go home':{en:'It is time to go home.',zh:'该回家了。'},
+  'around the world':{en:'They traveled around the world.',zh:'他们环游了世界。'},
+  'get up early':{en:'I get up early every day.',zh:'我每天早起。'},
+  'never give up':{en:'Never give up on your dream.',zh:'永远不要放弃你的梦想。'}
+};
+function makeChunkExample(chunk){
+  const c = (chunk || '').trim();
+  if (!c) return { en:'', zh:'' };
+  const key = c.toLowerCase();
+  if (CHUNK_EXAMPLES[key]) return CHUNK_EXAMPLES[key];
+  if (/^(take|get|put|turn|pick|look|wake|give|come|make|have|go|eat|drink|read|write|draw|play|run|jump|swim|dance|sing|sleep|work|travel|help|study|keep|feel|be|do|see|catch|ride|drive|launch|wear|win|kick|answer|use|save|peel|plant|climb|feed|walk)\b/i.test(c)){
+    return { en: `I usually ${c} in my daily life.`, zh: `我在日常生活中通常会“${c}”。` };
+  }
+  if (/^(a|an|the|some|many|a few|a bit of|a piece of|a pair of|a bunch of|a slice of|a bowl of|a cup of|a glass of|a bar of|a bottle of)\b/i.test(c)){
+    return { en: `I saw ${c} yesterday.`, zh: `我昨天看到了${c}。` };
+  }
+  return { en: `We often use "${c}" in English.`, zh: `我们在英语中经常使用“${c}”。` };
+}
+
+/* ==========================================================
+   ✨ 常用单词例句库（自然·生活化）
+   —— 供不在内置词典中的词使用，替代原来的 "This is a ..."
+   ========================================================== */
+const WORD_EXAMPLES = {
+  morning:['I go for a run every morning before breakfast.','我每天早饭前去跑步。'],
+  afternoon:['We have a meeting this afternoon.','我们今天下午有个会议。'],
+  evening:['She usually reads in the evening.','她通常在晚上看书。'],
+  night:['The city looks beautiful at night.','这座城市晚上很美。'],
+  today:['What day is it today?','今天是星期几？'],
+  tomorrow:['I will call you tomorrow.','我明天给你打电话。'],
+  yesterday:['We went to the zoo yesterday.','我们昨天去了动物园。'],
+  week:['I have three English classes a week.','我一周有三节英语课。'],
+  month:['The rent is due at the end of the month.','房租月底到期。'],
+  year:['Happy New Year to you and your family!','祝你和家人新年快乐！'],
+  birthday:['My birthday is in May.','我的生日在五月。'],
+  holiday:['We are going to the beach for the holiday.','我们假期要去海边。'],
+  summer:['It gets very hot in summer here.','这里夏天非常热。'],
+  winter:['I love watching the snow in winter.','我喜欢在冬天看雪。'],
+  spring:['Flowers bloom in spring.','春天花儿盛开。'],
+  autumn:['The leaves turn yellow in autumn.','秋天树叶变黄。'],
+  weather:['The weather is really nice today.','今天天气真不错。'],
+  sunny:['It is sunny and warm today.','今天阳光明媚又暖和。'],
+  cloudy:['It looks cloudy; take an umbrella with you.','天看起来阴沉沉的，带把伞吧。'],
+  rainy:['I do not like rainy days.','我不喜欢下雨天。'],
+  snowy:['The streets are quiet on snowy days.','下雪天街道很安静。'],
+  windy:['It is too windy to ride a bike today.','今天风太大，不适合骑自行车。'],
+  math:['Math is my favorite subject.','数学是我最喜欢的科目。'],
+  science:['We did an experiment in science class.','我们在科学课上做了个实验。'],
+  music:['She listens to music on the bus.','她在公交车上听音乐。'],
+  art:['He is really good at art.','他真的很擅长美术。'],
+  history:['I am reading a book about Chinese history.','我在读一本关于中国历史的书。'],
+  physics:['Physics explains how the world works.','物理学解释世界如何运转。'],
+  chemistry:['We learned about acids in chemistry class.','我们在化学课上学习了酸。'],
+  love:['I love spending time with my family.','我喜欢和家人待在一起。'],
+  dream:['Her dream is to become a doctor.','她的梦想是成为一名医生。'],
+  idea:['That is a great idea!','那是个好主意！'],
+  question:['May I ask you a question?','我可以问你一个问题吗？'],
+  answer:['I do not know the answer to this question.','我不知道这个问题的答案。'],
+  problem:['Do not worry, we can solve this problem.','别担心，我们能解决这个问题。'],
+  mistake:['Everyone makes mistakes, so do not be afraid.','每个人都会犯错，别害怕。'],
+  story:['Grandma told us a story before bed.','奶奶睡前给我们讲了个故事。'],
+  news:['Did you hear the news about the new park?','你听说新公园的消息了吗？'],
+  message:['I left him a message this morning.','我今天早上给他留了言。'],
+  email:['Please send me an email with the details.','请把细节用邮件发给我。'],
+  photo:['Can you take a photo of us?','你能给我们拍张照吗？'],
+  picture:['The child drew a picture of a cat.','孩子画了一只猫。'],
+  video:['We watched a short video in class.','我们在课上看了一段短视频。'],
+  game:['Let us play a game after dinner.','晚饭后我们玩个游戏吧。'],
+  song:['This song is stuck in my head.','这首歌一直在我脑子里回响。'],
+  movie:['We watched a funny movie last night.','我们昨晚看了一部有趣的电影。'],
+  party:['Are you coming to the party tonight?','你今晚来参加派对吗？'],
+  festival:['The Spring Festival is my favorite.','春节是我最喜欢的节日。'],
+  wedding:['They had a small wedding in the countryside.','他们在乡下办了一场小型婚礼。'],
+  wallet:['I left my wallet at home.','我把钱包忘在家里了。'],
+  coin:['He collects old coins from different countries.','他收集不同国家的旧硬币。'],
+  shop:['The shop closes at nine in the evening.','这家店晚上九点关门。'],
+  store:['I am going to the store to buy some milk.','我去商店买点牛奶。'],
+  supermarket:['We buy groceries at the supermarket.','我们在超市买日用品。'],
+  market:['The morning market is always busy.','早市总是很热闹。'],
+  bank:['I need to go to the bank today.','我今天要去银行。'],
+  hotel:['We stayed at a hotel near the beach.','我们住在海边的一家酒店。'],
+  restaurant:['This restaurant serves great noodles.','这家餐馆的面很好吃。'],
+  cinema:['Let us go to the cinema this weekend.','这周末我们去看电影吧。'],
+  museum:['The museum is free on Mondays.','博物馆周一免费。'],
+  zoo:['The kids love going to the zoo.','孩子们喜欢去动物园。'],
+  farm:['My uncle lives on a farm with many cows.','我叔叔住在一个养了很多奶牛的农场。'],
+  garden:['She grows tomatoes in her garden.','她在花园里种西红柿。'],
+  kitchen:['Mom is cooking dinner in the kitchen.','妈妈在厨房做晚饭。'],
+  bedroom:['My bedroom is on the second floor.','我的卧室在二楼。'],
+  bathroom:['The bathroom is at the end of the hall.','浴室在走廊尽头。'],
+  office:['He works in an office downtown.','他在市中心的一间办公室工作。'],
+  factory:['My father works in a car factory.','我爸爸在一家汽车厂工作。'],
+  station:['The train station is very crowded today.','今天火车站非常拥挤。'],
+  airport:['We arrived at the airport two hours early.','我们提前两小时到了机场。'],
+  bridge:['The bridge crosses the river near my home.','这座桥横跨我家附近的河流。'],
+  street:['The street is full of small shops.','这条街上全是小店。'],
+  road:['Drive carefully on this road.','在这条路上开车小心。'],
+  village:['He grew up in a small village.','他在一个小村庄长大。'],
+  town:['The town is very quiet at night.','这个小镇晚上很安静。'],
+  country:['Which country are you from?','你来自哪个国家？'],
+  castle:['The old castle stands on the hill.','那座古堡矗立在山丘上。'],
+  tower:['You can see the whole city from the tower.','从塔上你能看到整座城市。'],
+  stadium:['The stadium was full of excited fans.','体育场里坐满了兴奋的球迷。'],
+  gym:['I go to the gym three times a week.','我一周去三次健身房。'],
+  pool:['The kids are swimming in the pool.','孩子们在泳池里游泳。'],
+  boss:['My boss is very friendly.','我的老板很友好。'],
+  work:['I have a lot of work to do today.','我今天有很多工作要做。'],
+  job:['She found a new job in the city.','她在城里找到了一份新工作。'],
+  meeting:['The meeting starts at nine sharp.','会议九点整开始。'],
+  class:['Our class has thirty students.','我们班有三十个学生。'],
+  lesson:['Today we learned a new lesson.','今天我们学了新的一课。'],
+  test:['I have a math test on Friday.','我周五有数学测验。'],
+  exam:['She passed the exam easily.','她轻松通过了考试。'],
+  homework:['I finished my homework before dinner.','我在晚饭前完成了作业。'],
+  teacher2:['Our English teacher is very patient.','我们的英语老师很有耐心。'],
+  neighbor:['Our neighbor often helps us.','我们的邻居经常帮助我们。'],
+  team:['Our team won the game yesterday.','我们队昨天赢了比赛。'],
+  group:['We worked in a group of four.','我们四人一组工作。'],
+  language:['Learning a new language takes time.','学习一门新语言需要时间。'],
+  word:['I do not know this word.','我不认识这个词。'],
+  number:['What is your phone number?','你的电话号码是多少？'],
+  name:['My name is Li Ming.','我叫李明。'],
+  sign:['Please read the sign before you enter.','进门前请看一下标牌。'],
+  rule:['Everyone must follow the rules.','每个人都必须遵守规则。'],
+  journey:['The journey took about three hours.','这段旅程花了大约三小时。'],
+  trip:['We are planning a trip to the mountains.','我们正计划一次山区旅行。'],
+  adventure:['The trip turned into a real adventure.','这次旅行变成了一场真正的冒险。'],
+  memory:['I have happy memories of that summer.','我对那个夏天有着快乐的回忆。'],
+  wish:['Make a wish before you blow out the candles.','吹蜡烛前许个愿吧。'],
+  hope:['I hope you feel better soon.','希望你早日康复。'],
+  secret:['Can you keep a secret?','你能保守秘密吗？'],
+  danger:['The sign warns people of danger.','这个标志提醒人们注意危险。'],
+  safety:['Safety always comes first.','安全永远第一。'],
+  freedom:['Birds fly freely in the sky.','鸟儿在天空自由飞翔。'],
+  peace:['Everyone wants to live in peace.','每个人都想生活在和平中。'],
+  power:['The storm cut off the power last night.','昨晚暴风雨导致停电。'],
+  price:['The price of fruit went up this month.','这个月水果价格涨了。'],
+  size:['What size of shoes do you wear?','你穿多大码的鞋？'],
+  color:['Blue is my favorite color.','蓝色是我最喜欢的颜色。'],
+  shape:['The cake is in the shape of a heart.','这个蛋糕是心形的。'],
+  sound:['I heard a strange sound outside.','我听到外面有奇怪的声音。'],
+  smell:['The kitchen smells wonderful.','厨房里闻起来香极了。'],
+  taste:['This soup tastes really good.','这汤尝起来真不错。'],
+  voice:['She has a beautiful singing voice.','她的歌声很动听。'],
+  face:['He washed his face and went out.','他洗了脸就出门了。'],
+  hand:['Please wash your hands before eating.','吃饭前请洗手。'],
+  head:['She nodded her head and smiled.','她点了点头笑了。'],
+  foot:['My foot hurts after the long walk.','走了很长的路后我的脚疼。'],
+  eye:['Close your eyes and count to ten.','闭上眼睛数到十。'],
+  ear:['Rabbits have long ears.','兔子有长耳朵。'],
+  mouth:['Do not talk with your mouth full.','嘴里塞满东西时不要说话。'],
+  heart2:['Running is good for your heart.','跑步对心脏有好处。'],
+  rain2:['It started to rain in the afternoon.','下午开始下雨了。'],
+  snow2:['The snow covered the whole city.','雪覆盖了整个城市。'],
+  wind2:['The wind blew the leaves off the trees.','风把树叶吹落了。'],
+  happy2:['She looks very happy today.','她今天看起来很开心。'],
+  careful:['Be careful when you cross the road.','过马路时要小心。'],
+  kind:['It is very kind of you to help me.','你帮我真是太好了。'],
+  polite:['He is always polite to others.','他对别人总是很有礼貌。'],
+  honest:['She is an honest girl and never lies.','她是个诚实的女孩，从不撒谎。'],
+  patient:['Please be patient; the bus will come soon.','请耐心点，公交车很快就来。'],
+  careful2:['You should be more careful with your spelling.','你应该更注意拼写。'],
+  busy:['I am too busy to watch TV tonight.','我今晚太忙了，没时间看电视。'],
+  free:['Are you free this afternoon?','你今天下午有空吗？'],
+  ready:['Dinner is ready, come and eat!','晚饭好了，快来吃！'],
+  hungry:['I am hungry; let us get something to eat.','我饿了，我们吃点东西吧。'],
+  thirsty:['I am thirsty; can I have some water?','我渴了，能给我点水吗？'],
+  sleepy:['The baby is getting sleepy.','宝宝开始犯困了。'],
+  afraid:['Do not be afraid of making mistakes.','不要害怕犯错误。'],
+  proud:['My parents are proud of me.','我父母为我感到骄傲。'],
+  lucky:['You are so lucky to have such good friends.','你真有福气，有这么好的朋友。'],
+  different:['Everyone has a different opinion.','每个人都有不同的看法。'],
+  same:['We go to the same school.','我们上同一所学校。'],
+  important:['It is important to eat breakfast.','吃早餐很重要。'],
+  interesting:['This book is really interesting.','这本书真的很有意思。'],
+  boring:['The movie was too boring to finish.','这部电影太无聊了，看不下去。'],
+  dangerous:['It is dangerous to swim in this river.','在这条河里游泳很危险。'],
+  popular:['This song is very popular among students.','这首歌在学生中很流行。'],
+  famous:['The city is famous for its noodles.','这座城市以面条闻名。'],
+  useful:['This dictionary is very useful.','这本词典很有用。'],
+  careful3:['Please be careful with the hot water.','小心热水。'],
+  improve:['I want to improve my English.','我想提高我的英语水平。'],
+  practice:['Practice makes perfect.','熟能生巧。'],
+  remember:['I remember meeting her last year.','我记得去年见过她。'],
+  forget:['Do not forget to bring your book.','别忘了带书。'],
+  decide:['We decided to walk instead of taking the bus.','我们决定走路而不是坐公交。'],
+  explain:['Can you explain this rule to me?','你能给我解释一下这条规则吗？'],
+  discuss:['We discussed the plan for the weekend.','我们讨论了周末的计划。'],
+  arrive:['The train arrives at eight in the morning.','火车早上八点到达。'],
+  leave:['We need to leave before it gets dark.','我们需要在天黑前离开。'],
+  return:['He will return from Beijing next week.','他下周从北京回来。'],
+  borrow:['Can I borrow your pen for a minute?','我能借你的笔用一下吗？'],
+  lend:['Could you lend me your bike?','你能把自行车借给我吗？'],
+  invite:['She invited me to her birthday party.','她邀请我参加她的生日派对。'],
+  choose:['There are so many books to choose from.','有这么多书可供选择。'],
+  follow:['Please follow me; I will show you the way.','请跟我来，我给你带路。'],
+  share:['Good friends share their food.','好朋友会分享食物。'],
+  enjoy:['I really enjoy reading on rainy days.','我很喜欢在雨天读书。'],
+  prefer:['I prefer tea to coffee.','比起咖啡我更喜欢茶。'],
+  agree:['I agree with you completely.','我完全同意你的看法。'],
+  believe:['I believe you can do it.','我相信你能做到。'],
+  complain:['He often complains about the weather.','他经常抱怨天气。'],
+  promise:['I promise I will be there on time.','我保证我会准时到。'],
+  celebrate:['We celebrate the festival with our family.','我们和家人一起庆祝这个节日。'],
+  exercise:['I exercise for thirty minutes every day.','我每天锻炼三十分钟。'],
+  relax:['I like to relax with a cup of tea.','我喜欢喝杯茶放松一下。'],
+  worry:['Do not worry about the test.','别为考试担心。'],
+  smile2:['She smiled at me and waved.','她冲我微笑并挥手。'],
+  wait2:['We waited for the bus for twenty minutes.','我们等公交车等了二十分钟。']
+};
+
+/** 根据单词/词性生成例句（替换原来千篇一律的 This is a …） */
+function makeWordExample(word, pos){
+  const w = (word || '').trim();
+  if (!w) return { en:'', zh:'' };
+  const key = w.toLowerCase().replace(/[^a-z\s'-]/g, '').trim();
+  if (WORD_EXAMPLES[key]) return { en: WORD_EXAMPLES[key][0], zh: WORD_EXAMPLES[key][1] };
+
+  // 变形还原：复数 / 第三人称 / 过去式 / 现在分词 / 比较级
+  const stems = [];
+  if (/ies$/.test(key)) stems.push(key.slice(0,-3) + 'y');
+  if (/ves$/.test(key)) stems.push(key.slice(0,-3) + 'f');
+  if (/es$/.test(key)) stems.push(key.slice(0,-2));
+  if (/s$/.test(key)) stems.push(key.slice(0,-1));
+  if (/ing$/.test(key)){
+    stems.push(key.slice(0,-3));
+    stems.push(key.slice(0,-3) + 'e');
+    stems.push(key.slice(0,-4));
+  }
+  if (/ed$/.test(key)){
+    stems.push(key.slice(0,-2));
+    stems.push(key.slice(0,-1));
+  }
+  if (/er$/.test(key)){ stems.push(key.slice(0,-2)); stems.push(key.slice(0,-1)); }
+  if (/est$/.test(key)){ stems.push(key.slice(0,-3)); stems.push(key.slice(0,-2)); }
+  for (const s of stems){
+    if (s && s !== key && WORD_EXAMPLES[s]){
+      return { en: WORD_EXAMPLES[s][0], zh: WORD_EXAMPLES[s][1] };
+    }
+  }
+
+  const p = (pos || '').toLowerCase();
+  const isPhrase = /\s/.test(w);
+  if (isPhrase) return { en:`I usually ${w} after work.`, zh:`我通常下班后会${w}。` };
+  if (p.startsWith('verb')) return { en:`We often ${w} together on weekends.`, zh:`我们周末经常一起${w}。` };
+  if (p.startsWith('adj')) return { en:`The room feels really ${w} after the cleaning.`, zh:`打扫完之后，这房间感觉真的很${w}。` };
+  if (p.startsWith('adv')) return { en:`She speaks English quite ${w}.`, zh:`她英语说得相当${w}。` };
+  if (p.startsWith('noun')) return { en:`I need to buy a ${w} this afternoon.`, zh:`我今天下午需要买一个${w}。` };
+  const first = w.charAt(0).toLowerCase();
+  const article = /^[aeiou]/.test(first) ? 'an' : 'a';
+  return { en:`We talked about ${article} ${w} in class today.`, zh:`我们今天在课上讨论了「${w}」。` };
+}
+
+/* ===================== 内置词典 ===================== */
+const DICT_RAW = {
+apple:'苹果|n.|水果|🍎|an apple a day;apple pie;apple juice|She ate a red apple for breakfast.|她早餐吃了一个红苹果。',
+banana:'香蕉|n.|水果|🍌|a bunch of bananas|Monkeys love eating bananas.|猴子爱吃香蕉。',
+orange:'橙子；橙色|n./adj.|水果|🍊|orange juice|This orange is sweet and juicy.|这个橙子又甜又多汁。',
+grape:'葡萄|n.|水果|🍇|a bunch of grapes|She picked a bunch of grapes.|她摘了一串葡萄。',
+watermelon:'西瓜|n.|水果|🍉|a slice of watermelon|Watermelon is perfect for summer.|西瓜是夏天的绝配。',
+strawberry:'草莓|n.|水果|🍓|strawberry cake|The strawberry cake looks delicious.|这个草莓蛋糕看起来很好吃。',
+peach:'桃子|n.|水果|🍑|a juicy peach|The peach is soft and sweet.|这桃子又软又甜。',
+lemon:'柠檬|n.|水果|🍋|lemon juice|She squeezed a lemon into the water.|她把柠檬挤进水里。',
+cherry:'樱桃|n.|水果|🍒|cherry blossom|Cherry blossoms bloom in spring.|樱花在春天开放。',
+mango:'芒果|n.|水果|🥭|mango juice|This mango is very sweet.|这个芒果非常甜。',
+pineapple:'菠萝|n.|水果|🍍|pineapple juice|He cut the pineapple into pieces.|他把菠萝切成了块。',
+pear:'梨|n.|水果|🍐|a juicy pear|The pear tastes fresh.|这梨吃起来很新鲜。',
+carrot:'胡萝卜|n.|蔬菜|🥕|carrot soup|Rabbits love carrots.|兔子爱吃胡萝卜。',
+potato:'土豆|n.|蔬菜|🥔|mashed potatoes|I made mashed potatoes for dinner.|我晚餐做了土豆泥。',
+tomato:'西红柿|n.|蔬菜|🍅|tomato soup|She put a tomato in the salad.|她在沙拉里放了一个西红柿。',
+corn:'玉米|n.|蔬菜|🌽|sweet corn|The corn is ready to harvest.|玉米可以收割了。',
+broccoli:'西兰花|n.|蔬菜|🥦|steamed broccoli|Broccoli is rich in vitamins.|西兰花富含维生素。',
+cucumber:'黄瓜|n.|蔬菜|🥒|cucumber salad|He sliced the cucumber thinly.|他把黄瓜切得很薄。',
+onion:'洋葱|n.|蔬菜|🧅|chopped onion|Cutting onions makes me cry.|切洋葱让我流泪。',
+mushroom:'蘑菇|n.|蔬菜|🍄|mushroom soup|We picked mushrooms in the forest.|我们在森林里采蘑菇。',
+pepper:'辣椒；胡椒|n.|蔬菜|🌶️|black pepper|This pepper is too spicy for me.|这个辣椒对我来说太辣了。',
+dog:'狗|n.|动物|🐶|walk the dog|The dog wagged its tail happily.|那只狗开心地摇着尾巴。',
+cat:'猫|n.|动物|🐱|feed the cat|The cat is sleeping on the sofa.|猫正在沙发上睡觉。',
+rabbit:'兔子|n.|动物|🐰|a white rabbit|The rabbit hopped across the grass.|兔子蹦蹦跳跳地穿过草地。',
+panda:'熊猫|n.|动物|🐼|a giant panda|Pandas eat bamboo all day.|熊猫整天吃竹子。',
+tiger:'老虎|n.|动物|🐯|a fierce tiger|The tiger is the king of the forest.|老虎是森林之王。',
+lion:'狮子|n.|动物|🦁|the lion king|The lion roared loudly.|狮子大声吼叫。',
+elephant:'大象|n.|动物|🐘|a baby elephant|Elephants have long trunks.|大象有长长的鼻子。',
+monkey:'猴子|n.|动物|🐵|a clever monkey|The monkey climbed up the tree quickly.|猴子迅速爬上了树。',
+horse:'马|n.|动物|🐴|ride a horse|The horse ran across the field.|马跑过田野。',
+bird:'鸟|n.|动物|🐦|a little bird|Birds are singing in the tree.|鸟儿在树上歌唱。',
+penguin:'企鹅|n.|动物|🐧|a little penguin|Penguins live in cold places.|企鹅生活在寒冷的地方。',
+butterfly:'蝴蝶|n.|动物|🦋|a colorful butterfly|The butterfly landed on the flower.|蝴蝶落在花上。',
+fish:'鱼|n./v.|动物|🐟|fresh fish;go fishing|There are many fish in the pond.|池塘里有很多鱼。',
+dolphin:'海豚|n.|动物|🐬|a smart dolphin|Dolphins are very clever animals.|海豚是非常聪明的动物。',
+snake:'蛇|n.|动物|🐍|a green snake|The snake slid through the grass.|蛇滑过草地。',
+frog:'青蛙|n.|动物|🐸|a little frog|The frog jumped into the water.|青蛙跳进了水里。',
+bread:'面包|n.|食物|🍞|a slice of bread|She bought a loaf of bread.|她买了一条面包。',
+cake:'蛋糕|n.|食物|🍰|a birthday cake|We had a big birthday cake.|我们有一个大生日蛋糕。',
+egg:'鸡蛋|n.|食物|🥚|a boiled egg|I eat two eggs every morning.|我每天早上吃两个鸡蛋。',
+milk:'牛奶|n.|食物|🥛|a glass of milk|Drink a glass of milk before bed.|睡前喝一杯牛奶。',
+coffee:'咖啡|n.|食物|☕|a cup of coffee|He drinks coffee every morning.|他每天早上喝咖啡。',
+tea:'茶|n.|食物|🍵|green tea|Let us have a cup of tea.|我们喝杯茶吧。',
+rice:'米饭|n.|食物|🍚|fried rice|We eat rice every day.|我们每天都吃米饭。',
+noodle:'面条|n.|食物|🍜|beef noodles|These noodles taste great.|这些面条很好吃。',
+chocolate:'巧克力|n.|食物|🍫|a bar of chocolate|She loves dark chocolate.|她喜欢黑巧克力。',
+hamburger:'汉堡|n.|食物|🍔|a beef hamburger|He ordered a hamburger and fries.|他点了一个汉堡和薯条。',
+pizza:'披萨|n.|食物|🍕|a slice of pizza|Let us order a pizza tonight.|今晚我们点个披萨吧。',
+honey:'蜂蜜|n.|食物|🍯|pure honey|Bees make honey.|蜜蜂酿蜜。',
+water:'水|n.|食物|💧|a glass of water|Please give me a glass of water.|请给我一杯水。',
+sun:'太阳|n.|自然|☀️|the sun rises|The sun rises in the east.|太阳从东方升起。',
+moon:'月亮|n.|自然|🌙|a full moon|The moon is bright tonight.|今晚月亮很亮。',
+star:'星星；明星|n.|自然|⭐|a bright star|Stars twinkle in the night sky.|星星在夜空中闪烁。',
+rain:'雨；下雨|n./v.|自然|🌧️|heavy rain|It began to rain heavily.|开始下大雨了。',
+snow:'雪；下雪|n./v.|自然|❄️|heavy snow|The snow covered the whole city.|雪覆盖了整个城市。',
+rainbow:'彩虹|n.|自然|🌈|a beautiful rainbow|A rainbow appeared after the rain.|雨后出现了一道彩虹。',
+fire:'火|n.|自然|🔥|make a fire|They sat around the fire.|他们围坐在火边。',
+tree:'树|n.|自然|🌳|plant a tree|The tree is very tall.|这棵树非常高。',
+flower:'花|n.|自然|🌸|pick flowers|The flowers are blooming.|花儿正在盛开。',
+mountain:'山|n.|自然|⛰️|climb a mountain|We hiked up the mountain.|我们徒步爬上了山。',
+sea:'海|n.|自然|🌊|by the sea|The sea is calm today.|今天大海很平静。',
+beach:'海滩|n.|自然|🏖️|on the beach|We played on the beach all day.|我们在海滩上玩了一整天。',
+forest:'森林|n.|自然|🌲|a deep forest|The forest is full of tall trees.|森林里长满了高大的树。',
+earth:'地球|n.|自然|🌍|save the earth|We should protect the earth.|我们应该保护地球。',
+wind:'风|n.|自然|💨|strong wind|The wind is blowing hard.|风刮得很大。',
+car:'汽车|n.|交通|🚗|drive a car|He drives a red car.|他开一辆红色的车。',
+bus:'公共汽车|n.|交通|🚌|take a bus|I take the bus to school.|我坐公交车上学。',
+train:'火车|n.|交通|🚆|catch a train|The train arrived on time.|火车准时到达了。',
+airplane:'飞机|n.|交通|✈️|by airplane|The airplane flew above the clouds.|飞机飞过云层。',
+ship:'轮船|n.|交通|🚢|a big ship|The ship sailed across the ocean.|轮船驶过海洋。',
+bike:'自行车|n.|交通|🚲|ride a bike|She rides her bike to work.|她骑自行车上班。',
+taxi:'出租车|n.|交通|🚕|take a taxi|Let us take a taxi home.|我们打车回家吧。',
+rocket:'火箭|n.|交通|🚀|launch a rocket|The rocket flew into space.|火箭飞向太空。',
+subway:'地铁|n.|交通|🚇|take the subway|The subway is very fast.|地铁非常快。',
+book:'书|n.|物品|📚|read a book|I read a book before bed.|我睡前读一本书。',
+pen:'钢笔|n.|物品|🖊️|a blue pen|Write your name with a pen.|用钢笔写下你的名字。',
+pencil:'铅笔|n.|物品|✏️|a pencil case|He sharpened his pencil.|他削了铅笔。',
+phone:'电话；手机|n.|物品|📱|answer the phone|My phone is out of battery.|我的手机没电了。',
+computer:'电脑|n.|物品|💻|use a computer|She works on her computer all day.|她整天在电脑上工作。',
+camera:'相机|n.|物品|📷|take a photo|He bought a new camera.|他买了一台新相机。',
+clock:'时钟|n.|物品|⏰|an alarm clock|The clock on the wall is slow.|墙上的钟慢了。',
+key:'钥匙；关键|n.|物品|🔑|the key to|I cannot find my keys.|我找不到钥匙了。',
+gift:'礼物|n.|物品|🎁|a birthday gift|She gave me a lovely gift.|她送了我一份可爱的礼物。',
+money:'钱|n.|物品|💰|save money|He saved money for a new bike.|他攒钱买新自行车。',
+umbrella:'雨伞|n.|物品|☂️|take an umbrella|Do not forget your umbrella.|别忘了带伞。',
+glasses:'眼镜|n.|物品|👓|a pair of glasses|He wears glasses to read.|他戴眼镜看书。',
+hat:'帽子|n.|物品|👒|wear a hat|She wore a red hat.|她戴了一顶红帽子。',
+shoe:'鞋子|n.|物品|👟|a pair of shoes|These shoes are very comfortable.|这双鞋很舒服。',
+bag:'包|n.|物品|👜|a school bag|She put the book in her bag.|她把书放进包里。',
+door:'门|n.|物品|🚪|open the door|Please close the door.|请关门。',
+window:'窗户|n.|物品|🪟|open the window|The window is open.|窗户开着。',
+house:'房子|n.|物品|🏠|a big house|They live in a small house.|他们住在一栋小房子里。',
+letter:'信；字母|n.|物品|✉️|write a letter|I received a letter from my friend.|我收到了朋友的来信。',
+map:'地图|n.|物品|🗺️|a world map|Look at the map on the wall.|看墙上的地图。',
+ticket:'票|n.|物品|🎫|a train ticket|I bought two movie tickets.|我买了两张电影票。',
+robot:'机器人|n.|物品|🤖|a smart robot|The robot can clean the room.|这个机器人能打扫房间。',
+trophy:'奖杯|n.|物品|🏆|win a trophy|She won the first prize trophy.|她赢得了冠军奖杯。',
+ball:'球|n.|物品|⚽|play ball|The boys are playing with a ball.|男孩们在玩球。',
+guitar:'吉他|n.|物品|🎸|play the guitar|He plays the guitar very well.|他吉他弹得很好。',
+piano:'钢琴|n.|物品|🎹|play the piano|She practices the piano every day.|她每天练钢琴。',
+baby:'婴儿|n.|人物|👶|a baby boy|The baby is sleeping.|宝宝在睡觉。',
+teacher:'老师|n.|人物|👩‍🏫|an English teacher|Our teacher is very kind.|我们的老师很和善。',
+doctor:'医生|n.|人物|👨‍⚕️|see a doctor|The doctor saved his life.|医生救了他的命。',
+student:'学生|n.|人物|🎓|a good student|She is a hardworking student.|她是个勤奋的学生。',
+friend:'朋友|n.|人物|🤝|best friend|He is my best friend.|他是我最好的朋友。',
+family:'家庭|n.|人物|👨‍👩‍👧|a happy family|I love my family.|我爱我的家人。',
+happy:'快乐的|adj.|情绪|😊|feel happy|She looks very happy today.|她今天看起来很开心。',
+sad:'悲伤的|adj.|情绪|😢|feel sad|He felt sad about the news.|他对这个消息感到难过。',
+angry:'生气的|adj.|情绪|😠|get angry|Do not be angry with me.|别生我的气。',
+tired:'疲倦的|adj.|情绪|😴|feel tired|I am too tired to walk.|我太累了走不动。',
+excited:'兴奋的|adj.|情绪|🤩|feel excited|The kids are excited about the trip.|孩子们对这次旅行很兴奋。',
+surprised:'惊讶的|adj.|情绪|😲|be surprised|I was surprised to see him.|见到他我很惊讶。',
+run:'跑；经营|v.|动作|🏃|run fast|He runs every morning.|他每天早上跑步。',
+walk:'走；散步|v.|动作|🚶|take a walk|We walked along the river.|我们沿着河散步。',
+jump:'跳|v.|动作|🤸|jump high|The cat jumped onto the table.|猫跳上了桌子。',
+swim:'游泳|v.|动作|🏊|go swimming|She swims in the pool every week.|她每周在泳池游泳。',
+dance:'跳舞|v.|动作|💃|dance to music|They danced all night.|他们跳了一整晚的舞。',
+sing:'唱歌|v.|动作|🎤|sing a song|She sang a beautiful song.|她唱了一首动听的歌。',
+sleep:'睡觉|v.|动作|😴|go to sleep|The baby is sleeping quietly.|宝宝安静地睡着了。',
+eat:'吃|v.|动作|🍽️|eat out|We eat dinner at seven.|我们七点吃晚饭。',
+drink:'喝|v.|动作|🥤|drink water|Drink more water every day.|每天多喝水。',
+read:'阅读|v.|动作|📖|read a book|He reads the newspaper every morning.|他每天早上看报纸。',
+write:'写|v.|动作|✍️|write a letter|She writes in her diary every night.|她每晚写日记。',
+draw:'画画；拉|v.|动作|🎨|draw a picture|The child drew a cat.|孩子画了一只猫。',
+laugh:'笑|v.|动作|😂|laugh out loud|We laughed at his joke.|我们被他的笑话逗笑了。',
+cry:'哭|v.|动作|😭|cry loudly|The baby cried all night.|宝宝哭了一整晚。',
+think:'思考|v.|动作|🤔|think about|Think before you speak.|说话前先思考。',
+study:'学习|v./n.|动作|📚|study hard|She studies English every day.|她每天学英语。',
+work:'工作|v./n.|动作|💼|go to work|He works in a bank.|他在银行工作。',
+play:'玩；演奏|v.|动作|🎮|play games|The children play in the park.|孩子们在公园玩。',
+travel:'旅行|v.|动作|🧳|travel around|They travel around the world.|他们环游世界。',
+help:'帮助|v./n.|动作|🙋|help sb. with sth.|Can you help me?|你能帮我吗？',
+big:'大的|adj.|形容词|🐘|a big house|That is a big elephant.|那是一头大象。',
+small:'小的|adj.|形容词|🐜|a small town|She lives in a small village.|她住在一个小村庄。',
+hot:'热的|adj.|形容词|🔥|hot weather|It is very hot today.|今天很热。',
+cold:'冷的|adj.|形容词|🧊|cold water|The water is too cold.|水太凉了。',
+fast:'快的|adj./adv.|形容词|⚡|run fast|He is a fast runner.|他跑得很快。',
+slow:'慢的|adj.|形容词|🐢|slow down|The turtle is very slow.|乌龟很慢。',
+new:'新的|adj.|形容词|🆕|a new bike|I bought a new phone.|我买了一部新手机。',
+old:'旧的；年老的|adj.|形容词|🕰️|an old man|This is an old photo.|这是一张老照片。',
+beautiful:'美丽的|adj.|形容词|🌺|a beautiful flower|What a beautiful sunset!|多美的日落啊！',
+strong:'强壮的|adj.|形容词|💪|strong enough|He is strong and healthy.|他强壮又健康。',
+easy:'容易的|adj.|形容词|👌|an easy question|This question is easy.|这个问题很简单。',
+difficult:'困难的|adj.|形容词|🧩|a difficult task|English is not difficult.|英语并不难。',
+clean:'干净的|adj./v.|形容词|✨|keep clean|The room is very clean.|房间很干净。',
+dirty:'脏的|adj.|形容词|🗑️|dirty clothes|Your shoes are dirty.|你的鞋很脏。',
+school:'学校|n.|地点|🏫|go to school|Our school is very big.|我们学校很大。',
+library:'图书馆|n.|地点|📚|in the library|I study in the library.|我在图书馆学习。',
+hospital:'医院|n.|地点|🏥|go to hospital|The hospital is near here.|医院就在附近。',
+park:'公园|n.|地点|🏞️|in the park|We walk in the park.|我们在公园散步。',
+home:'家|n.|地点|🏡|at home|I want to go home.|我想回家。',
+city:'城市|n.|地点|🏙️|a big city|Shanghai is a modern city.|上海是一座现代城市。',
+world:'世界|n.|地点|🌏|around the world|The world is changing fast.|世界变化很快。',
+'take off':'起飞；脱下|phr.|短语|🛫|the plane takes off|The plane took off on time.|飞机准时起飞了。',
+'get up':'起床|phr.|短语|⏰|get up early|I get up at six every day.|我每天六点起床。',
+'wake up':'醒来|phr.|短语|🌅|wake up early|She woke up late this morning.|她今天早上起晚了。',
+'look after':'照顾|phr.|短语|👶|look after the baby|She looks after her little brother.|她照顾她的小弟弟。',
+'give up':'放弃|phr.|短语|🏳️|never give up|Do not give up so easily.|别这么轻易放弃。',
+'pick up':'捡起；接人|phr.|短语|🤲|pick up the phone|He picked up the pen from the floor.|他从地上捡起笔。',
+'put on':'穿上|phr.|短语|👕|put on a coat|Put on your shoes.|穿上你的鞋。',
+'turn on':'打开（电器）|phr.|短语|💡|turn on the light|Please turn on the TV.|请打开电视。',
+'turn off':'关闭（电器）|phr.|短语|🔌|turn off the light|Do not forget to turn off the lights.|别忘了关灯。',
+'come true':'实现|phr.|短语|✨|a dream comes true|His dream finally came true.|他的梦想终于实现了。',
+'make friends':'交朋友|phr.|短语|🤝|make friends with|It is easy to make friends here.|在这里很容易交到朋友。',
+'have fun':'玩得开心|phr.|短语|🎉|have fun together|We had fun at the party.|我们在派对上玩得很开心。',
+'on time':'准时|phr.|短语|⌚|arrive on time|The train arrived on time.|火车准时到达。',
+'at once':'立刻|phr.|短语|⚡|do it at once|Come here at once!|马上过来！',
+'in front of':'在……前面|phr.|短语|➡️|in front of the house|A car stopped in front of me.|一辆车停在我面前。'
+};
+const DICT = (() => {
+  const out = {};
+  for (const k in DICT_RAW){
+    const p = DICT_RAW[k].split('|');
+    out[k] = {
+      zh: p[0] || '', pos: p[1] || '', cat: p[2] || '其他',
+      emoji: p[3] || '',
+      chunks: (p[4] || '').split(';').map(s => s.trim()).filter(Boolean),
+      sentence: p[5] || '', sentenceZh: p[6] || '',
+      phonetic: PHONETIC_MAP_NORM[k] || ''
+    };
+  }
+  return out;
+})();
+
+/* ==========================================================
+   🖼️ 配图智能匹配（多级回退，尽量避免张冠李戴）
+   ========================================================== */
+function guessEmoji(word, cat){
+  const raw = (word || '').trim().toLowerCase();
+  if (!raw) return '';
+
+  // 1) 精确命中词典
+  if (DICT[raw] && DICT[raw].emoji) return DICT[raw].emoji;
+  if (EMOJI_MAP_NORM[raw]) return EMOJI_MAP_NORM[raw];
+
+  // 2) 规范化（去标点、连字符转空格）
+  const norm = raw.replace(/[^a-z\s'-]/g, '').replace(/[-']/g, ' ')
+                   .replace(/\s+/g, ' ').trim();
+  if (norm !== raw){
+    if (DICT[norm] && DICT[norm].emoji) return DICT[norm].emoji;
+    if (EMOJI_MAP_NORM[norm]) return EMOJI_MAP_NORM[norm];
+  }
+
+  // 3) 词形变化还原
+  const stems = [];
+  if (/ies$/.test(norm)) stems.push(norm.slice(0,-3) + 'y');
+  if (/ves$/.test(norm)) stems.push(norm.slice(0,-3) + 'f');
+  if (/es$/.test(norm)) stems.push(norm.slice(0,-2));
+  if (/s$/.test(norm)) stems.push(norm.slice(0,-1));
+  if (/ing$/.test(norm)){
+    stems.push(norm.slice(0,-3));
+    stems.push(norm.slice(0,-3) + 'e');
+    stems.push(norm.slice(0,-4));
+  }
+  if (/ed$/.test(norm)){
+    stems.push(norm.slice(0,-2));
+    stems.push(norm.slice(0,-1));
+  }
+  if (/er$/.test(norm)){ stems.push(norm.slice(0,-2)); stems.push(norm.slice(0,-1)); }
+  if (/est$/.test(norm)){ stems.push(norm.slice(0,-3)); stems.push(norm.slice(0,-2)); }
+  for (const s of stems){
+    if (s && s !== norm){
+      if (DICT[s] && DICT[s].emoji) return DICT[s].emoji;
+      if (EMOJI_MAP_NORM[s]) return EMOJI_MAP_NORM[s];
+    }
+  }
+
+  // 4) 复合词 / 短语：先整体，再逐词（跳过虚词）
+  const parts = norm.split(/\s+/).filter(Boolean);
+  if (parts.length > 1){
+    const joined = parts.join('_');
+    if (EMOJI_MAP_NORM[parts.join(' ')]) return EMOJI_MAP_NORM[parts.join(' ')];
+    if (EMOJI_MAP[joined]) return EMOJI_MAP[joined];
+    for (const p of parts){
+      if (DICT[p] && DICT[p].emoji) return DICT[p].emoji;
+      if (EMOJI_MAP_NORM[p]) return EMOJI_MAP_NORM[p];
+    }
+    const stop = new Set(['a','an','the','of','to','in','on','at','for','with','and','or',
+      'my','your','his','her','its','our','their','some','any','this','that','these','those',
+      'is','are','was','were','be','do','does','did','have','has','had','very','really','so',
+      'too','more','most','up','down','out','off','over','into','from','by','as','not','no']);
+    for (const p of parts){
+      if (stop.has(p) || p.length < 2) continue;
+      if (DICT[p] && DICT[p].emoji) return DICT[p].emoji;
+      if (EMOJI_MAP_NORM[p]) return EMOJI_MAP_NORM[p];
+    }
+  }
+
+  // 5) 仅在「具体类别」时用类别图标兜底，避免形容词/其他类被乱配图
+  if (cat && CONCRETE_CAT_EMOJI[cat]) return CONCRETE_CAT_EMOJI[cat];
+
+  return '';
+}
+function guessChunkEmoji(chunk){
+  const parts = (chunk || '').toLowerCase().replace(/[^a-z\s'-]/g,' ')
+                         .split(/\s+/).filter(Boolean);
+  for (const p of parts){
+    if (EMOJI_MAP_NORM[p]) return EMOJI_MAP_NORM[p];
+    if (DICT[p] && DICT[p].emoji) return DICT[p].emoji;
+  }
+  return '';
+}
+function guessPhonetic(word){
+  const w = (word || '').toLowerCase().trim();
+  if (!w) return '';
+  if (PHONETIC_MAP_NORM[w]) return PHONETIC_MAP_NORM[w];
+  if (DICT[w] && DICT[w].phonetic) return DICT[w].phonetic;
+  return '';
+}
+function guessCat(word, pos){
+  const w = (word || '').trim().toLowerCase();
+  if (DICT[w] && DICT[w].cat) return DICT[w].cat;
+  if (w.includes(' ')) return '短语';
+  const p = (pos || '').toLowerCase();
+  if (p.startsWith('verb')) return '动作';
+  if (p.startsWith('adj') || p.startsWith('adv')) return '形容词';
+  if (p.startsWith('noun')) return '物品';
+  return '其他';
+}
+async function onlineLookup(word){
+  const w = (word || '').trim();
+  const res = { zh:'', pos:'', cat:'', emoji:'', phonetic:'', chunks:[], sentence:'', sentenceZh:'', from:'online' };
+  if (!w) return res;
+  const local = DICT[w.toLowerCase()];
+  if (local) return Object.assign(res, local, { from:'local' });
+  if (!isOnline){ res.from = 'offline'; return res; }
+
+  const tasks = [];
+  tasks.push(
+    fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(w) + '&langpair=en|zh-CN')
+      .then(r => r.json())
+      .then(j => {
+        const t = j && j.responseData && j.responseData.translatedText;
+        if (t && !/^[A-Z_]+$/.test(t)) res.zh = String(t).trim();
+      }).catch(() => {})
+  );
+  tasks.push(
+    fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(w.toLowerCase()))
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!Array.isArray(j) || !j[0]) return;
+        const entry = j[0];
+        if (entry.phonetic) res.phonetic = entry.phonetic;
+        else if (entry.phonetics){
+          const p = entry.phonetics.find(x => x.text);
+          if (p) res.phonetic = p.text;
+        }
+        const meanings = entry.meanings || [];
+        if (meanings[0]) res.pos = meanings[0].partOfSpeech || '';
+        const exs = [];
+        meanings.forEach(m => (m.definitions || []).forEach(d => {
+          if (d.example && exs.length < 3) exs.push(d.example);
+        }));
+        if (exs.length){ res.sentence = exs[0]; res.chunks = exs.slice(1); }
+      }).catch(() => {})
+  );
+  await Promise.all(tasks);
+  if (res.sentence){
+    try {
+      const r = await fetch('https://api.mymemory.translated.net/get?q=' +
+        encodeURIComponent(res.sentence) + '&langpair=en|zh-CN');
+      const j = await r.json();
+      const t = j && j.responseData && j.responseData.translatedText;
+      if (t) res.sentenceZh = String(t).trim();
+    } catch(e){}
+  }
+  res.cat = guessCat(w, res.pos);
+  res.emoji = guessEmoji(w, res.cat);
+  if (!res.phonetic) res.phonetic = guessPhonetic(w);
+  if (!res.zh) res.from = 'fail';
+  return res;
+}
+
+/* ===================== 数据层 ===================== */
+const LS_KEY = 'wordTrainer.words.v4';
+const LS_KEY_OLD = 'wordTrainer.words.v3';
+const LS_CATS = 'wordTrainer.cats.v1';
+const DEFAULT_CAT = '默认';
+const AUTO_CAT = '__auto__';
+const ALL_CAT = '__all__';
+
+let words = [];
+let cats = [DEFAULT_CAT];
+let selected = new Set();
+let editingId = null;
+let session = null;
+let quickResult = null;
+let autoUpdating = false;
+
+function normalizeChunk(c){
+  if (typeof c === 'string'){
+    const ex = makeChunkExample(c);
+    return { text: c, sentence: ex.en, sentenceZh: ex.zh, emoji: guessChunkEmoji(c) };
+  }
+  if (c && typeof c === 'object'){
+    const text = c.text || c.t || '';
+    if (!text) return null;
+    let ex = c.sentence ? null : makeChunkExample(text);
+    return {
+      text,
+      sentence: c.sentence || (ex ? ex.en : ''),
+      sentenceZh: c.sentenceZh || (ex ? ex.zh : ''),
+      emoji: c.emoji || guessChunkEmoji(text)
+    };
+  }
+  return null;
+}
+function normalizeWord(x){
+  const w = {
+    id: x.id || uid(),
+    w: x.w || '', d: x.d || '',
+    cat: x.cat || DEFAULT_CAT,
+    wrong: x.wrong || 0,
+    emoji: x.emoji || '',
+    pos: x.pos || '',
+    phonetic: x.phonetic || '',
+    chunks: [],
+    sentence: x.sentence || '',
+    sentenceZh: x.sentenceZh || ''
+  };
+  w.chunks = (Array.isArray(x.chunks) ? x.chunks : []).map(normalizeChunk).filter(Boolean);
+  return w;
+}
+function loadDataSync(){
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch(e){}
+  if (!raw){
+    try { raw = JSON.parse(localStorage.getItem(LS_KEY_OLD) || '[]'); } catch(e){ raw = []; }
+  }
+  words = (Array.isArray(raw) ? raw : []).map(normalizeWord);
+  words.forEach(w => enrichFromLocal(w));
+  try { cats = JSON.parse(localStorage.getItem(LS_CATS)) || []; } catch(e){ cats = []; }
+  if (!Array.isArray(cats) || !cats.length) cats = [DEFAULT_CAT];
+  if (!cats.includes(DEFAULT_CAT)) cats.unshift(DEFAULT_CAT);
+  words.forEach(x => { if (x.cat && !cats.includes(x.cat)) cats.push(x.cat); });
+  return words.length > 0;
+}
+function tryRestoreFromBackup(){
+  backupLoadLatest().then(backup => {
+    if (!backup || !backup.data) return;
+    const backupWords = backup.data.words || backup.data;
+    if (!Array.isArray(backupWords) || !backupWords.length) return;
+    if (words.length > 0) return;
+    words = backupWords.map(normalizeWord);
+    if (Array.isArray(backup.data.cats) && backup.data.cats.length){
+      cats = backup.data.cats.slice();
+      if (!cats.includes(DEFAULT_CAT)) cats.unshift(DEFAULT_CAT);
+    }
+    words.forEach(enrichFromLocal);
+    words.forEach(x => { if (x.cat && !cats.includes(x.cat)) cats.push(x.cat); });
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(words));
+      localStorage.setItem(LS_CATS, JSON.stringify(cats));
+    } catch(e){}
+    refreshCatSelects();
+    renderList();
+    renderCatList();
+    updateSelInfo();
+    toast('已从自动备份中恢复 ' + words.length + ' 个单词', 'ok');
+  }).catch(() => {});
+}
+
+/**
+ * 用内置数据补全词条。
+ * 例句、配图会按规则重算，从而修正历史版本里的
+ * 「This is a …」例句和错误配图。
+ */
+function enrichFromLocal(item, opts){
+  if (!item) return item;
+  const force = !!(opts && opts.force);
+  const w = (item.w || '').toLowerCase().trim();
+  const d = DICT[w];
+
+  // 释义 / 词性 / 类别
+  if (d && !item.d) item.d = d.zh;
+  if (d && !item.pos) item.pos = d.pos;
+  if (d && (!item.cat || item.cat === DEFAULT_CAT) && d.cat && d.cat !== '其他'){
+    item.cat = d.cat;
+  }
+
+  // 配图：始终按当前规则重算，修正旧版误配
+  const emo = guessEmoji(item.w, item.cat);
+  item.emoji = emo || '';
+
+  // 音标
+  if (!item.phonetic || force){
+    item.phonetic = (d && d.phonetic) || guessPhonetic(item.w) || item.phonetic || '';
+  }
+
+  // 例句：识别旧的「This is a …」模板句并替换
+  const curSent = String(item.sentence || '').trim();
+  const isAutoThisIs = /^This is (a|an) /i.test(curSent);
+  if (!curSent || isAutoThisIs || force){
+    if (d && d.sentence){
+      item.sentence = d.sentence;
+      item.sentenceZh = d.sentenceZh || item.sentenceZh || '';
+    } else {
+      const ex = makeWordExample(item.w, item.pos || (d ? d.pos : ''));
+      item.sentence = ex.en;
+      item.sentenceZh = ex.zh;
+    }
+  }
+
+  // 常用搭配
+  if (d){
+    const existing = new Map((item.chunks || []).map(c => [c.text.toLowerCase(), c]));
+    const merged = [];
+    (d.chunks || []).forEach(text => {
+      const k = text.toLowerCase();
+      if (existing.has(k)){ merged.push(existing.get(k)); existing.delete(k); }
+      else {
+        const ex = makeChunkExample(text);
+        merged.push({ text, sentence: ex.en, sentenceZh: ex.zh, emoji: guessChunkEmoji(text) });
+      }
+    });
+    existing.forEach(c => merged.push(c));
+    item.chunks = merged;
+  }
+
+  (item.chunks || []).forEach(c => {
+    if (!c.emoji) c.emoji = guessChunkEmoji(c.text);
+    if (!c.sentence){ const ex = makeChunkExample(c.text); c.sentence = ex.en; c.sentenceZh = ex.zh; }
+  });
+
+  return item;
+}
+function saveData(){
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(words));
+    localStorage.setItem(LS_CATS, JSON.stringify(cats));
+  } catch(e){
+    console.warn('localStorage 写入失败：', e);
+  }
+  refreshCatSelects();
+  renderList();
+  renderCatList();
+  updateSelInfo();
+  scheduleBackup();
+}
+let backupTimer = null;
+function scheduleBackup(){
+  if (backupTimer) clearTimeout(backupTimer);
+  backupTimer = setTimeout(() => {
+    backupSave({ words, cats, savedAt: Date.now() }).then(ok => {
+      if (ok) renderBackupStatus();
+    }).catch(() => {});
+  }, 500);
+}
+async function autoUpdatePendingItems(){
+  if (!isOnline || autoUpdating) return;
+  const pending = words.filter(w =>
+    w.w && !DICT[w.w.toLowerCase()] &&
+    (!w.d || !w.sentence || /^This is (a|an) /i.test(w.sentence || '') || !w.phonetic || !w.pos)
+  );
+  if (!pending.length) return;
+  autoUpdating = true;
+  try {
+    const limit = Math.min(pending.length, 8);
+    let updated = 0;
+    for (let i = 0; i < limit; i++){
+      const it = pending[i];
+      try {
+        const data = await onlineLookup(it.w);
+        let changed = false;
+        if (data.zh && !it.d){ it.d = data.zh; changed = true; }
+        if (data.emoji && !it.emoji){ it.emoji = data.emoji; changed = true; }
+        if (data.pos && !it.pos){ it.pos = data.pos; changed = true; }
+        if (data.phonetic && !it.phonetic){ it.phonetic = data.phonetic; changed = true; }
+        if (data.sentence && (!it.sentence || /^This is (a|an) /i.test(it.sentence))){
+          it.sentence = data.sentence; changed = true;
+        }
+        if (data.sentenceZh && !it.sentenceZh){ it.sentenceZh = data.sentenceZh; changed = true; }
+        if (data.cat && data.cat !== '其他' && (!it.cat || it.cat === DEFAULT_CAT)){
+          it.cat = data.cat; changed = true;
+        }
+        if (data.chunks && data.chunks.length && (!it.chunks || !it.chunks.length)){
+          it.chunks = data.chunks.map(c => {
+            const text = typeof c === 'string' ? c : c.text;
+            const ex = makeChunkExample(text);
+            return { text, sentence: ex.en, sentenceZh: ex.zh, emoji: guessChunkEmoji(text) };
+          });
+          changed = true;
+        }
+        if (changed){
+          enrichFromLocal(it);
+          if (!cats.includes(it.cat)) cats.push(it.cat);
+          updated++;
+        }
+      } catch(e){}
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if (updated){
+      saveData();
+      toast(`已自动补全 ${updated} 个词条`, 'ok');
+    }
+  } finally {
+    autoUpdating = false;
+  }
+}
+
+/* ==========================================================
+   🔊 语音播放（修复例句无声问题）
+   - 单词：优先在线真人发音（有道），失败回退系统 TTS
+   - 句子 / 长文本：直接用系统 TTS（有道不适合整句）
+   - 取消与播放之间留出微小间隔，避免 Chrome 静默失败
+   ========================================================== */
+let voices = [];
+function refreshVoices(){ voices = window.speechSynthesis ? speechSynthesis.getVoices() : []; }
+if (window.speechSynthesis){ refreshVoices(); speechSynthesis.onvoiceschanged = refreshVoices; }
+
+function pickVoice(lang){
+  const pre = (lang || 'en-US').slice(0, 2).toLowerCase();
+  const wantGB = /GB$/i.test(lang || '');
+  const list = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(pre));
+  if (!list.length) return null;
+  // 优先系统里质量较高的英文语音
+  return list.find(v => /google|natural|online|premium|enhanced/i.test(v.name || ''))
+      || list.find(v => new RegExp(wantGB ? 'en-GB' : 'en-US', 'i').test(v.lang))
+      || list[0];
+}
+let currentAudio = null;
+let lastSpeakId = 0;
+
+function speakLocal(text, targetLang, rate){
+  if (!window.speechSynthesis) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice(targetLang);
+    if (v){ u.voice = v; u.lang = v.lang; } else { u.lang = targetLang; }
+    u.rate = rate;
+    u.volume = 1;
+    u.onerror = () => {};
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+
+function stopAllSpeech(){
+  if (currentAudio){
+    try { currentAudio.pause(); } catch(e){}
+    try { currentAudio.src = ''; } catch(e){}
+    currentAudio = null;
+  }
+  if (window.speechSynthesis){
+    try { speechSynthesis.cancel(); } catch(e){}
+  }
+}
+
+function speak(text, lang){
+  const t = String(text == null ? '' : text).trim();
+  if (!t) return;
+  const myId = ++lastSpeakId;
+  const rateEl = $('#rate');
+  const rate = parseFloat((rateEl && rateEl.value) || 0.85) || 0.85;
+  const targetLang = lang || (accent === 'uk' ? 'en-GB' : 'en-US');
+
+  stopAllSpeech();
+
+  // 句子 / 长文本：直接走系统 TTS（更稳定）
+  const isSentence = /\s/.test(t) && t.length > 20;
+  const useTTS = !isOnline || isSentence || t.length > 40;
+
+  if (useTTS){
+    // 给 cancel 留出一点时间，避免 Chrome「cancel 后立刻 speak」失效
+    setTimeout(() => {
+      if (myId === lastSpeakId) speakLocal(t, targetLang, rate);
+    }, 90);
+    return;
+  }
+
+  try {
+    const type = accent === 'uk' ? 1 : 2;
+    const audio = new Audio('https://dict.youdao.com/dictvoice?type=' + type +
+      '&audio=' + encodeURIComponent(t));
+    audio.playbackRate = rate;
+    let settled = false;
+    const fallback = () => {
+      if (settled) return;
+      settled = true;
+      if (myId !== lastSpeakId) return;
+      speakLocal(t, targetLang, rate);
+    };
+    audio.onerror = fallback;
+    currentAudio = audio;
+    const p = audio.play();
+    if (p && p.catch) p.catch(fallback);
+    // 2 秒内没播起来就回退
+    setTimeout(() => {
+      if (myId === lastSpeakId && !settled && (audio.paused || audio.error)){
+        fallback();
+      }
+    }, 2000);
+  } catch(e){
+    speakLocal(t, targetLang, rate);
+  }
+}
+
+function speakLetter(ch){
+  return new Promise(resolve => {
+    if (!window.speechSynthesis){ resolve(); return; }
+    const u = new SpeechSynthesisUtterance(ch);
+    const v = pickVoice(accent === 'uk' ? 'en-GB' : 'en-US');
+    if (v){ u.voice = v; u.lang = v.lang; } else { u.lang = accent === 'uk' ? 'en-GB' : 'en-US'; }
+    u.rate = 0.55; u.pitch = 1.1;
+    let done = false;
+    const finish = () => { if (!done){ done = true; resolve(); } };
+    u.onend = finish; u.onerror = finish;
+    setTimeout(finish, 1200);
+    speechSynthesis.speak(u);
+  });
+}
+async function spellWord(word){
+  if (!word) return;
+  if (!window.speechSynthesis){ speak(word); return; }
+  stopAllSpeech();
+  const letters = word.toLowerCase().replace(/[^a-z]/g, '').split('');
+  for (const ch of letters){
+    await speakLetter(ch);
+    await new Promise(r => setTimeout(r, 60));
+  }
+  await new Promise(r => setTimeout(r, 250));
+  speak(word);
+}
+
+/* ===================== 校验 ===================== */
+const WORD_RE = /^[a-zA-Z][a-zA-Z\s'\-.·]*$/;
+function validateWordOnly(w){
+  const word = (w || '').trim();
+  if (!word) return '单词为空';
+  if (!/[a-zA-Z]/.test(word)) return '不含英文字母';
+  if (!WORD_RE.test(word)) return '含有非法字符';
+  if (word.length > 80) return '单词过长（超过 80 字符）';
+  return '';
+}
+function validateEntry(w, d, id){
+  const errors = [], warnings = [];
+  const word = (w || '').trim();
+  const mean = (d || '').trim();
+  const we = validateWordOnly(word);
+  if (we) errors.push(we);
+  if (word){
+    const dup = words.find(x => x.id !== id && x.w.toLowerCase() === word.toLowerCase());
+    if (dup) errors.push(`「${dup.w}」已存在于类型「${dup.cat || DEFAULT_CAT}」中`);
+  }
+  if (!mean) warnings.push('未填写中文释义');
+  return { errors, warnings, word, mean };
+}
+function parseInput(text){
+  const out = [];
+  text.split(/\r?\n/).forEach(raw => {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) return;
+    let w = '', d = '', c = '';
+    if (line.includes('|')){
+      const p = line.split('|');
+      w = (p[0] || '').trim();
+      d = (p[1] || '').trim();
+      c = (p[2] || '').trim();
+    } else if (line.includes('\t')){
+      const p = line.split('\t');
+      w = (p[0] || '').trim();
+      d = (p[1] || '').trim();
+      c = (p[2] || '').trim();
+    } else {
+      const ci = line.search(/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/);
+      if (ci > 0){
+        w = line.slice(0, ci).replace(/[\s,，:：;；\-–—.]+$/, '').trim();
+        d = line.slice(ci).trim();
+      } else {
+        const m = line.match(/^([^\s,，:：]+)[\s,，:：]+(.+)$/);
+        if (m){ w = m[1].trim(); d = m[2].trim(); }
+        else { w = line; }
+      }
+    }
+    if (w) out.push({ w, d, cat: c });
+  });
+  return out;
+}
+function fillCatSelect(sel, allLabel, includeAuto){
+  if (!sel) return;
+  const prev = sel.value;
+  let html = '';
+  if (allLabel !== null) html += `<option value="">${escapeHtml(allLabel)}</option>`;
+  if (includeAuto) html += `<option value="${AUTO_CAT}">（按内置词典自动匹配）</option>`;
+  html += cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sel.innerHTML = html;
+  if (prev && (cats.includes(prev) || prev === AUTO_CAT || prev === '')) sel.value = prev;
+  else sel.value = allLabel !== null ? '' : (includeAuto ? AUTO_CAT : (cats[0] || DEFAULT_CAT));
+}
+function refreshCatSelects(){
+  fillCatSelect($('#catSel'), '全部类型', false);
+  fillCatSelect($('#catFilter'), '全部类型', false);
+  fillCatSelect($('#batchCat'), null, false);
+  fillCatSelect($('#importCat'), null, true);
+  renderDictationCatPicker();
+  const exp = $('#exportCat');
+  if (exp){
+    const prev = exp.value;
+    exp.innerHTML = `<option value="${ALL_CAT}">全部分类</option>` +
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if (prev && (cats.includes(prev) || prev === ALL_CAT)) exp.value = prev;
+    else exp.value = ALL_CAT;
+  }
+  const expX = $('#excelExportCat');
+  if (expX){
+    const prev = expX.value;
+    expX.innerHTML = `<option value="${ALL_CAT}">全部分类</option>` +
+      cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if (prev && (cats.includes(prev) || prev === ALL_CAT)) expX.value = prev;
+    else expX.value = ALL_CAT;
+  }
+}
+function figureHtml(item, cls){
+  const emo = item.emoji || guessEmoji(item.w, item.cat);
+  if (emo) return `<div class="emoji-fig ${cls || ''}">${emo}</div>`;
+  const ch = (item.w || '?').charAt(0).toUpperCase();
+  return `<div class="letter-fig ${cls === 'hero' ? 'hero' : ''}">${escapeHtml(ch)}</div>`;
+}
+function miniFigHtml(item){
+  const emo = item.emoji || guessEmoji(item.w, item.cat);
+  if (emo) return `<span class="mini-fig">${emo}</span>`;
+  const ch = (item.w || '?').charAt(0).toUpperCase();
+  return `<span class="mini-fig"><span class="letter-fig mini">${escapeHtml(ch)}</span></span>`;
+}
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({length: m + 1}, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++){
+    for (let j = 1; j <= n; j++){
+      dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1,
+        dp[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+  }
+  return dp[m][n];
+}
+function calcStars(target, recognized){
+  const t = (target || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+  const r = (recognized || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+  if (!r) return 0;
+  if (t === r) return 3;
+  const dist = levenshtein(t, r);
+  const maxLen = Math.max(t.length, r.length);
+  const sim = 1 - dist / maxLen;
+  if (sim >= 0.9) return 3;
+  if (sim >= 0.7) return 2;
+  if (sim >= 0.4) return 1;
+  return 0;
+}
+
+/* ===================== 类型管理 ===================== */
+function renderCatList(){
+  const el = $('#catList');
+  if (!el) return;
+  if (!cats.length){ el.innerHTML = '<div class="hint">暂无类型</div>'; return; }
+  const countMap = {};
+  cats.forEach(c => countMap[c] = 0);
+  words.forEach(w => {
+    const c = w.cat || DEFAULT_CAT;
+    if (countMap[c] === undefined) countMap[c] = 0;
+    countMap[c]++;
+  });
+  const summaryEl = $('#catSummary');
+  if (summaryEl) summaryEl.textContent = `共 ${cats.length} 种类型`;
+  el.innerHTML = cats.map(c => {
+    const n = countMap[c] || 0;
+    const isDefault = c === DEFAULT_CAT;
+    const canDelete = !isDefault && cats.length > 1;
+    const title = isDefault ? '默认类型不可删除'
+                : (cats.length <= 1 ? '至少要保留一个类型' : '删除此类型');
+    return `<div class="cat-row">
+      <span class="cat-name">${escapeHtml(c)}</span>
+      <span class="cat-count">${n} 个单词</span>
+      <button data-del-cat="${escapeHtml(c)}" title="${title}" ${canDelete ? '' : 'disabled'}>×</button>
+    </div>`;
+  }).join('');
+}
+async function deleteCat(cat){
+  if (cat === DEFAULT_CAT){ playSound('error'); return toast('「默认」类型不可删除', 'err'); }
+  if (cats.length <= 1){ playSound('error'); return toast('至少要保留一个类型', 'err'); }
+  const count = words.filter(w => (w.cat || DEFAULT_CAT) === cat).length;
+  const otherCats = cats.filter(c => c !== cat);
+  if (count === 0){
+    const ok = await confirmDialog({
+      title: '删除类型？',
+      message: `即将删除空类型「${escapeHtml(cat)}」`,
+      icon: '🗂️', confirmText: '确认删除'
+    });
+    if (!ok) return;
+    cats = cats.filter(c => c !== cat);
+    dictationCats.delete(cat);
+    saveData(); playSound('delete');
+    toast(`已删除类型「${cat}」`, 'ok');
+    return;
+  }
+  const result = await deleteCatDialog(cat, count, otherCats);
+  if (!result) return;
+  if (result.action === 'move'){
+    const target = result.target;
+    if (!target || !cats.includes(target)){
+      playSound('error');
+      return toast('目标类型无效', 'err');
+    }
+    words.forEach(w => { if ((w.cat || DEFAULT_CAT) === cat) w.cat = target; });
+    cats = cats.filter(c => c !== cat);
+    dictationCats.delete(cat);
+    saveData(); playSound('delete');
+    toast(`已删除类型「${cat}」，${count} 个单词已移至「${target}」`, 'ok');
+  } else {
+    words = words.filter(w => (w.cat || DEFAULT_CAT) !== cat);
+    selected.clear();
+    cats = cats.filter(c => c !== cat);
+    dictationCats.delete(cat);
+    saveData(); playSound('delete');
+    toast(`已删除类型「${cat}」及其下 ${count} 个单词`, 'ok');
+  }
+}
+
+/* ===================== 学习逻辑 ===================== */
+const currentItem = () => session ? session.queue[session.idx] : null;
+function startSession(){
+  const mode  = $('#mode').value;
+  const scope = $('#scope').value;
+  const cat   = $('#catSel').value;
+  const count = parseInt($('#countSel').value, 10) || 0;
+  let pool = words.filter(x => x.w);
+  if (scope === 'wrong') pool = pool.filter(x => (x.wrong || 0) > 0);
+  if (cat) pool = pool.filter(x => (x.cat || DEFAULT_CAT) === cat);
+  if (!pool.length){
+    playSound('error');
+    alert(scope === 'wrong' ? '还没有符合条件的错词，先去练一轮吧~' : '没有符合条件的单词，请检查词库或类型筛选。');
+    return;
+  }
+  pool = shuffle(pool.slice());
+  const totalAvailable = pool.length;
+  if (count > 0) pool = pool.slice(0, count);
+  session = {
+    queue: pool, idx: 0, mode,
+    right: 0, wrong: 0, wrongItems: [],
+    answered: false, opts: null, hintLevel: 0, usedHint: false, totalAvailable,
+    starStats: { 3: 0, 2: 0, 1: 0, 0: 0 },
+    listenRetried: false, answers: {}
+  };
+  playSound('start');
+  renderQuestion();
+}
+function goPrev(){
+  if (!session || session.idx <= 0) return;
+  const currAns = session.answers[session.idx];
+  if (currAns){
+    if (currAns.ok) session.right = Math.max(0, session.right - 1);
+    else session.wrong = Math.max(0, session.wrong - 1);
+    if (!currAns.ok){
+      const wi = session.wrongItems.findIndex(x => x.id === currAns.item.id);
+      if (wi >= 0) session.wrongItems.splice(wi, 1);
+    }
+    delete session.answers[session.idx];
+  }
+  session.idx--;
+  const prevAns = session.answers[session.idx];
+  if (prevAns){
+    if (prevAns.ok) session.right = Math.max(0, session.right - 1);
+    else session.wrong = Math.max(0, session.wrong - 1);
+    if (!prevAns.ok){
+      const wi = session.wrongItems.findIndex(x => x.id === prevAns.item.id);
+      if (wi >= 0) session.wrongItems.splice(wi, 1);
+    }
+    delete session.answers[session.idx];
+  }
+  session.answered = false;
+  session.listenRetried = false;
+  session.hintLevel = 0;
+  session.usedHint = false;
+  playSound('click');
+  renderQuestion();
+}
+function renderQuestion(){
+  if (!session) return;
+  if (session.idx >= session.queue.length) return renderSummary();
+  session.answered = false; session.opts = null;
+  session.hintLevel = 0; session.usedHint = false;
+  session.listenRetried = false;
+  const item = currentItem();
+  const mode = session.mode;
+  $('#feedback').textContent = ''; $('#feedback').className = 'feedback';
+  $('#hintBox').innerHTML = ''; $('#options').innerHTML = '';
+  $('#cardStudy').hidden = true; $('#cardStudy').innerHTML = '';
+  $('#pronounceArea').hidden = true; $('#pronounceArea').innerHTML = '';
+  $('#answer').value = ''; $('#answer').className = '';
+  $('#answer').disabled = false; $('#answer').style.display = '';
+  $('#submitBtn').disabled = false;
+  $('#hintBtn').disabled = false;
+  $('#hintBtn').style.display = '';
+  $('#playSentenceBtn').style.display = 'none';
+  $('#showAnswerBtn').style.display = 'none';
+  $('#spellBtn').style.display = '';
+  $('#playBtn').style.display = '';
+  $('#prevBtn').disabled = session.idx <= 0;
+
+  if (mode === 'card'){
+    $('#prompt').innerHTML = '';
+    $('#answer').style.display = 'none';
+    $('#submitBtn').disabled = true;
+    $('#hintBtn').style.display = 'none';
+    renderCardStudy(item);
+    if (item.sentence) $('#playSentenceBtn').style.display = '';
+    speak(item.w);
+    updateProgress();
+    return;
+  }
+  if (mode === 'pronounce'){
+    $('#prompt').innerHTML = '';
+    $('#answer').style.display = 'none';
+    $('#submitBtn').disabled = true;
+    $('#hintBtn').style.display = 'none';
+    $('#spellBtn').style.display = 'none';
+    $('#playBtn').style.display = 'none';
+    $('#playSentenceBtn').style.display = 'none';
+    renderPronounce(item);
+    updateProgress();
+    return;
+  }
+  if (mode === 'choose'){
+    const others = shuffle(words.filter(x => x.w !== item.w && x.d)).slice(0, 3);
+    const opts = shuffle([item, ...others]);
+    session.opts = opts;
+    $('#hintBtn').style.display = 'none';
+    $('#prompt').innerHTML = `${figureHtml(item)}
+      <div class="big">🔊 听发音，选出正确的释义</div>`;
+    $('#answer').style.display = 'none';
+    $('#options').innerHTML = opts
+      .map((o, i) => `<button class="opt" data-i="${i}">${escapeHtml(o.d || o.w)}</button>`).join('');
+    speak(item.w);
+    updateProgress();
+    return;
+  }
+  if (mode === 'mean'){
+    $('#prompt').innerHTML = `${figureHtml(item, 'hero')}
+      <div class="big">${escapeHtml(item.d || '（无释义）')}</div>
+      <div class="sub">看图和中文，写出对应的英文单词</div>`;
+    $('#answer').placeholder = '输入英文单词';
+    $('#answer').focus();
+    updateProgress();
+    return;
+  }
+  if (mode === 'listen'){
+    $('#prompt').innerHTML = `<div class="big">🔊 听发音，拼出单词</div>
+      <div class="sub">输入框为空时按空格可重播</div>`;
+    $('#answer').placeholder = '输入英文单词';
+    speak(item.w);
+    $('#answer').focus();
+    updateProgress();
+    return;
+  }
+  updateProgress();
+}
+function renderCardStudy(item){
+  const chunks = (item.chunks || []).filter(c => c && c.text);
+  const phonetic = item.phonetic || guessPhonetic(item.w);
+  const wordSentence = item.sentence || '';
+  const wordSentenceZh = item.sentenceZh || '';
+  const sentHtml = wordSentence
+    ? `<div class="study-block">
+         <div class="study-label">📖 例句（点击朗读）</div>
+         <div class="say-line" data-say="${escapeHtml(wordSentence)}" title="点击朗读整句">${escapeHtml(wordSentence)}</div>
+         ${wordSentenceZh ? `<div class="say-line-zh">${escapeHtml(wordSentenceZh)}</div>` : ''}
+       </div>` : '';
+  const chunkHtml = chunks.length
+    ? `<div class="study-block">
+         <div class="study-label">🔗 常用搭配（点击朗读）</div>
+         ${chunks.map(c => `
+           <div class="chunk-card">
+             <div class="chunk-text" data-say="${escapeHtml(c.text)}" title="点击朗读词块">${escapeHtml(c.text)}</div>
+             ${c.sentence ? `<div class="chunk-ex" data-say="${escapeHtml(c.sentence)}" title="点击朗读例句">${escapeHtml(c.sentence)}</div>` : ''}
+             ${c.sentenceZh ? `<div class="chunk-ex-zh">${escapeHtml(c.sentenceZh)}</div>` : ''}
+           </div>`).join('')}
+       </div>` : '';
+  $('#cardStudy').hidden = false;
+  $('#cardStudy').innerHTML = `
+    <div class="study-card">
+      ${figureHtml(item, 'hero')}
+      <div class="study-word" data-say="${escapeHtml(item.w)}" title="点击朗读">${escapeHtml(item.w)}</div>
+      ${phonetic ? `<div class="study-phonetic">${escapeHtml(phonetic)}</div>` : ''}
+      <div class="study-meta">
+        ${item.pos ? `<span class="study-pos">${escapeHtml(item.pos)}</span>` : ''}
+        <span class="study-pos">${escapeHtml(item.cat || DEFAULT_CAT)}</span>
+      </div>
+      <div class="study-zh">${escapeHtml(item.d || '（暂无释义）')}</div>
+      ${sentHtml}
+      ${chunkHtml}
+    </div>`;
+}
+let recognition = null;
+let recognizing = false;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function renderPronounce(item){
+  const phonetic = item.phonetic || guessPhonetic(item.w);
+  const supported = !!SR;
+  $('#pronounceArea').hidden = false;
+  $('#pronounceArea').innerHTML = `
+    <div class="pronounce-card">
+      ${figureHtml(item, 'hero')}
+      <div class="pronounce-word">${escapeHtml(item.w)}</div>
+      ${phonetic ? `<div class="pronounce-phonetic">${escapeHtml(phonetic)}</div>` : ''}
+      <div class="pronounce-tip">
+        ${supported ? '点击下方按钮朗读，说完后立即自动评分（约 0.7 秒内响应）'
+                    : '⚠️ 当前浏览器不支持语音识别。建议使用 Chrome 或 Edge 打开。'}
+      </div>
+      ${supported ? `<button class="record-btn" id="recordBtn">🎤 开始朗读</button>` : ''}
+      <div id="recordStatus"></div>
+      <div class="stars-display" id="starsDisplay">
+        <span class="s">⭐</span><span class="s">⭐</span><span class="s">⭐</span>
+      </div>
+      <div class="recognize-result" id="recognizeResult"></div>
+    </div>`;
+  if (supported) $('#recordBtn').onclick = () => startRecording(item);
+  setTimeout(() => speak(item.w), 300);
+}
+function startRecording(item){
+  if (!SR || recognizing) return;
+  recognizing = true;
+  const btn = $('#recordBtn');
+  const status = $('#recordStatus');
+  const result = $('#recognizeResult');
+  const starsEl = $('#starsDisplay');
+  if (btn){ btn.disabled = true; btn.classList.add('listening'); btn.textContent = '🎤 正在聆听…'; }
+  if (status) status.textContent = '请朗读单词…';
+  if (result) result.innerHTML = '';
+  starsEl.querySelectorAll('.s').forEach(s => s.classList.remove('on'));
+  let finalProcessed = false;
+  let hadSpeech = false;
+  let silenceTimer = null;
+  let totalTimer = null;
+  const cleanupTimers = () => {
+    if (silenceTimer){ clearTimeout(silenceTimer); silenceTimer = null; }
+    if (totalTimer){ clearTimeout(totalTimer); totalTimer = null; }
+  };
+  const processFinal = (alts) => {
+    if (finalProcessed) return;
+    finalProcessed = true;
+    cleanupTimers();
+    try { recognition.stop(); } catch(e){}
+    let best = { text: alts[0] || '', stars: 0, sim: -1 };
+    alts.forEach(t => {
+      const stars = calcStars(item.w, t);
+      const sim = 1 - levenshtein(item.w.toLowerCase(), t.toLowerCase().replace(/[^a-z ]/g, '').trim()) /
+                  Math.max(item.w.length, t.length);
+      if (sim > best.sim){ best = { text: t, stars, sim }; }
+    });
+    showPronounceResult(item, best.text, best.stars);
+  };
+  try {
+    recognition = new SR();
+    recognition.lang = accent === 'uk' ? 'en-GB' : 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 5;
+    recognition.onresult = e => {
+      hadSpeech = true;
+      const res = e.results[e.results.length - 1];
+      const transcript = res[0] ? res[0].transcript : '';
+      if (status && !res.isFinal && transcript){ status.textContent = '听到：' + transcript; }
+      if (res.isFinal){
+        const alts = [];
+        for (let i = 0; i < res.length; i++) alts.push(res[i].transcript);
+        processFinal(alts);
+      } else {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          const alts = [];
+          for (let i = 0; i < res.length; i++) alts.push(res[i].transcript);
+          processFinal(alts);
+        }, 700);
+      }
+    };
+    recognition.onerror = e => {
+      cleanupTimers();
+      if (e.error === 'no-speech'){ if (status) status.textContent = '没有听到声音，请靠近麦克风再试一次'; }
+      else if (e.error === 'not-allowed'){ if (status) status.textContent = '请允许浏览器使用麦克风权限'; }
+      else if (e.error === 'aborted'){}
+      else if (e.error === 'audio-capture'){ if (status) status.textContent = '未检测到麦克风设备'; }
+      else { if (status) status.textContent = '识别失败：' + e.error; }
+      if (e.error !== 'aborted' && !finalProcessed) playSound('error');
+      cleanupRecordBtn();
+    };
+    recognition.onend = () => {
+      recognizing = false;
+      cleanupTimers();
+      cleanupRecordBtn();
+      if (!finalProcessed && !hadSpeech && status){ status.textContent = '没听清，请再试一次'; }
+    };
+    recognition.start();
+    totalTimer = setTimeout(() => {
+      if (!finalProcessed){
+        try { recognition.stop(); } catch(e){}
+        if (!hadSpeech && status) status.textContent = '没有听到声音，请再试一次';
+      }
+    }, 5000);
+  } catch(e){
+    cleanupTimers();
+    recognizing = false;
+    cleanupRecordBtn();
+    if (status) status.textContent = '无法启动录音：' + (e.message || '未知错误');
+  }
+}
+function cleanupRecordBtn(){
+  const btn = $('#recordBtn');
+  if (btn){ btn.disabled = false; btn.classList.remove('listening'); btn.textContent = '🎤 再读一次'; }
+}
+function showPronounceResult(item, recognized, stars){
+  const status = $('#recordStatus');
+  const result = $('#recognizeResult');
+  const starsEl = $('#starsDisplay');
+  if (status) status.textContent = '';
+  if (result) result.innerHTML = `识别结果：<b>${escapeHtml(recognized || '（无）')}</b>`;
+  const starSpans = starsEl.querySelectorAll('.s');
+  starSpans.forEach((s, i) => { if (i < stars) s.classList.add('on'); });
+  if (stars === 3) playSound('star3');
+  else if (stars === 2) playSound('star2');
+  else if (stars === 1) playSound('star1');
+  else playSound('star0');
+  if (session){
+    session.starStats[stars] = (session.starStats[stars] || 0) + 1;
+    if (stars >= 2) { session.right++; item.wrong = 0; }
+    else {
+      session.wrong++;
+      item.wrong = (item.wrong || 0) + 1;
+      session.wrongItems.push(item);
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify(words));
+    scheduleBackup();
+  }
+  session.answered = true;
+  updateProgress();
+}
+function renderHint(){
+  if (!session) return;
+  const item = currentItem(); if (!item) return;
+  const lvl = session.hintLevel;
+  if (lvl <= 0){ $('#hintBox').innerHTML = ''; return; }
+  const letters = item.w.split('');
+  const masked = letters.map((ch, i) => /[a-zA-Z]/.test(ch) ? (i < lvl ? ch : '_') : ch).join(' ');
+  const letterCount = item.w.replace(/[^a-zA-Z]/g, '').length;
+  let html = `<div class="hint-line">💡 共 ${letterCount} 个字母，首字母 <b>${escapeHtml(item.w[0] || '')}</b>`;
+  if (item.d) html += `，释义：${escapeHtml(item.d)}`;
+  html += `</div><div class="hint-mask">${escapeHtml(masked)}</div>`;
+  $('#hintBox').innerHTML = html;
+}
+function showHint(){
+  if (!session || session.answered || session.mode === 'card' || session.mode === 'pronounce') return;
+  const item = currentItem(); if (!item) return;
+  if (session.hintLevel >= item.w.length) return;
+  session.hintLevel++; session.usedHint = true;
+  playSound('hint'); renderHint();
+  if (session.hintLevel >= item.w.length) $('#hintBtn').disabled = true;
+}
+function check(ok, item){
+  if (!ok && session.mode === 'listen' && !session.listenRetried){
+    session.listenRetried = true;
+    $('#feedback').innerHTML = '<span class="listen-retry-badge">❌ 错误，请再试一次</span>';
+    $('#feedback').className = 'feedback bad';
+    playSound('wrong');
+    $('#answer').value = '';
+    $('#answer').classList.add('input-bad');
+    setTimeout(() => {
+      $('#answer').classList.remove('input-bad');
+      $('#answer').focus();
+    }, 600);
+    $('#showAnswerBtn').style.display = '';
+    return;
+  }
+  session.answered = true;
+  session.answers[session.idx] = { ok, item };
+  $('#answer').disabled = true;
+  $('#submitBtn').disabled = true;
+  $('#hintBtn').disabled = true;
+  $('#showAnswerBtn').style.display = 'none';
+  if (ok){
+    session.right++;
+    if (!session.listenRetried) item.wrong = 0;
+    $('#feedback').textContent = session.usedHint ? '✅ 正确（用了提示，记得再复习一下）' : '✅ 正确';
+    $('#feedback').className = 'feedback ok';
+    playSound('correct');
+    $('#answer').classList.remove('input-bad');
+    $('#answer').classList.add('input-ok');
+    setTimeout(() => speak(item.w), 280);
+    setTimeout(() => { if (session && session.answered) next(); }, 1200);
+  } else {
+    session.wrong++;
+    item.wrong = (item.wrong || 0) + 1;
+    session.wrongItems.push(item);
+    $('#feedback').innerHTML = `❌ 正确答案：<b>${escapeHtml(item.w)}</b>` +
+      (item.d ? ` — ${escapeHtml(item.d)}` : '');
+    $('#feedback').className = 'feedback bad';
+    playSound('wrong');
+    $('#answer').classList.add('input-bad');
+    const letters = item.w.split('');
+    const letterCount = item.w.replace(/[^a-zA-Z]/g, '').length;
+    let hintHtml = `<div class="hint-line">💡 共 ${letterCount} 个字母，首字母 <b>${escapeHtml(item.w[0] || '')}</b>`;
+    if (item.d) hintHtml += `，释义：${escapeHtml(item.d)}`;
+    hintHtml += `</div><div class="hint-mask">${escapeHtml(letters.join(' · '))}</div>`;
+    if (item.sentence) hintHtml += `<div class="hint-line" style="margin-top:8px">📖 ${escapeHtml(item.sentence)}</div>`;
+    $('#hintBox').innerHTML = hintHtml;
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(words));
+  scheduleBackup();
+  updateProgress();
+}
+function submitAnswer(){
+  if (!session || session.answered) return;
+  if (session.mode === 'card' || session.mode === 'pronounce') return;
+  const item = currentItem();
+  const val = $('#answer').value.trim();
+  if (!val){ playSound('error'); return; }
+  check(val.toLowerCase() === item.w.toLowerCase(), item);
+}
+function showAnswer(){
+  if (!session || session.answered) return;
+  const item = currentItem(); if (!item) return;
+  session.answered = true;
+  session.answers[session.idx] = { ok: false, item };
+  session.wrong++;
+  item.wrong = (item.wrong || 0) + 1;
+  session.wrongItems.push(item);
+  $('#feedback').innerHTML = `❌ 正确答案：<b>${escapeHtml(item.w)}</b>` +
+    (item.d ? ` — ${escapeHtml(item.d)}` : '');
+  $('#feedback').className = 'feedback bad';
+  $('#answer').disabled = true;
+  $('#submitBtn').disabled = true;
+  $('#hintBtn').disabled = true;
+  $('#showAnswerBtn').style.display = 'none';
+  $('#answer').classList.add('input-bad');
+  const letters = item.w.split('');
+  const letterCount = item.w.replace(/[^a-zA-Z]/g, '').length;
+  let hintHtml = `<div class="hint-line">💡 共 ${letterCount} 个字母，首字母 <b>${escapeHtml(item.w[0] || '')}</b>`;
+  if (item.d) hintHtml += `，释义：${escapeHtml(item.d)}`;
+  hintHtml += `</div><div class="hint-mask">${escapeHtml(letters.join(' · '))}</div>`;
+  if (item.sentence) hintHtml += `<div class="hint-line" style="margin-top:8px">📖 ${escapeHtml(item.sentence)}</div>`;
+  $('#hintBox').innerHTML = hintHtml;
+  playSound('wrong');
+  localStorage.setItem(LS_KEY, JSON.stringify(words));
+  scheduleBackup();
+  updateProgress();
+}
+function next(){ if (!session) return; session.idx++; renderQuestion(); }
+function updateProgress(){
+  if (!session) return;
+  const total = session.queue.length;
+  const done = Math.min(session.idx + (session.answered ? 1 : 0), total);
+  let extra = '';
+  if (session.totalAvailable > total) extra = `（从 ${session.totalAvailable} 个中抽取）`;
+  if (session.mode === 'card'){
+    $('#progress').textContent = `${Math.min(session.idx + 1, total)} / ${total}　📇 卡片学习　${extra}`;
+    return;
+  }
+  if (session.mode === 'pronounce'){
+    const s = session.starStats || {};
+    $('#progress').textContent =
+      `${Math.min(session.idx + 1, total)} / ${total}　🎤 发音测试　` +
+      `⭐⭐⭐ ${s[3] || 0}　⭐⭐ ${s[2] || 0}　⭐ ${s[1] || 0}`;
+    return;
+  }
+  $('#progress').textContent = `${done} / ${total}　｜　✅ ${session.right}　❌ ${session.wrong}　${extra}`;
+}
+function renderSummary(){
+  const s = session;
+  if (s.mode === 'card'){
+    $('#prompt').innerHTML = `<div class="big">卡片学习完成 🎉</div>
+      <div class="sub">共浏览 ${s.queue.length} 个单词</div>`;
+    $('#cardStudy').hidden = true; $('#cardStudy').innerHTML = '';
+    $('#answer').style.display = 'none';
+    $('#submitBtn').disabled = true; $('#hintBtn').disabled = true;
+    $('#playSentenceBtn').style.display = 'none';
+    $('#showAnswerBtn').style.display = 'none';
+    $('#spellBtn').style.display = 'none'; $('#playBtn').style.display = 'none';
+    $('#options').innerHTML = '';
+    $('#progress').textContent = `卡片学习完成，共 ${s.queue.length} 个`;
+    playSound('complete');
+    return;
+  }
+  if (s.mode === 'pronounce'){
+    const stats = s.starStats || {};
+    const total = s.queue.length;
+    $('#prompt').innerHTML = `<div class="big">发音测试完成 🎉</div>
+      <div class="sub">共 ${total} 个单词 ·
+        ⭐⭐⭐ ${stats[3] || 0}　⭐⭐ ${stats[2] || 0}　⭐ ${stats[1] || 0}</div>`;
+    $('#pronounceArea').hidden = true; $('#pronounceArea').innerHTML = '';
+    $('#submitBtn').disabled = true; $('#hintBtn').disabled = true;
+    $('#playSentenceBtn').style.display = 'none';
+    $('#showAnswerBtn').style.display = 'none';
+    $('#spellBtn').style.display = 'none'; $('#playBtn').style.display = 'none';
+    $('#options').innerHTML = '';
+    $('#progress').textContent = `发音测试完成 · 三星 ${stats[3] || 0} 个`;
+    playSound((stats[3] || 0) >= total * 0.6 ? 'star3' : 'complete');
+    return;
+  }
+  const total = s.right + s.wrong;
+  const rate = total ? Math.round(s.right / total * 100) : 0;
+  $('#prompt').innerHTML = `<div class="big">本轮完成 🎉</div>
+    <div class="sub">共 ${total} 题 · 正确 ${s.right} · 错误 ${s.wrong} · 正确率 ${rate}%</div>`;
+  $('#answer').style.display = 'none'; $('#answer').className = '';
+  $('#cardStudy').hidden = true;
+  $('#submitBtn').disabled = true; $('#hintBtn').disabled = true;
+  $('#playSentenceBtn').style.display = 'none';
+  $('#showAnswerBtn').style.display = 'none';
+  $('#options').innerHTML = '';
+  $('#progress').textContent = `${total} / ${total}　｜　✅ ${s.right}　❌ ${s.wrong}`;
+  playSound(rate >= 80 ? 'complete' : 'save');
+  const uniq = [...new Map(s.wrongItems.map(x => [x.w, x])).values()];
+  if (uniq.length){
+    $('#options').innerHTML = `<button class="opt" id="retryBtn">🔁 重练本轮错词（${uniq.length} 个）</button>`;
+    $('#retryBtn').onclick = () => {
+      session = {
+        queue: shuffle(uniq.slice()), idx: 0, mode: s.mode,
+        right: 0, wrong: 0, wrongItems: [],
+        answered: false, opts: null, hintLevel: 0, usedHint: false,
+        totalAvailable: uniq.length, starStats: { 3:0, 2:0, 1:0, 0:0 },
+        listenRetried: false, answers: {}
+      };
+      playSound('start'); renderQuestion();
+    };
+  } else {
+    $('#options').innerHTML = `<div class="sub" style="text-align:center">全对，太棒了！</div>`;
+  }
+}
+
+/* ===================== 快速添加 ===================== */
+function renderQuickPreview(data, rawWord, status){
+  const box = $('#quickPreview');
+  const emo = data.emoji || guessEmoji(rawWord, data.cat);
+  let badge = '';
+  if (status === 'local') badge = '<span class="badge local">内置词典</span>';
+  else if (status === 'online') badge = '<span class="badge online">在线匹配</span>';
+  else if (status === 'offline') badge = '<span class="badge fail">离线模式</span>';
+  else if (status === 'fail') badge = '<span class="badge fail">未匹配到释义</span>';
+  const chunks = (data.chunks || []).filter(Boolean);
+  const chunkHtml = chunks.length
+    ? chunks.map(c => {
+        const text = typeof c === 'string' ? c : c.text;
+        const ex = typeof c === 'string' ? makeChunkExample(c) : { en: c.sentence, zh: c.sentenceZh };
+        const em = guessChunkEmoji(text);
+        return `<div style="margin-top:8px;border-left:3px solid #dde6ff;padding-left:8px">
+          ${em ? `<span style="font-size:14px">${em}</span> ` : ''}<span class="chunk-text" data-say="${escapeHtml(text)}" title="点击朗读">${escapeHtml(text)}</span>
+          ${ex.en ? `<div class="chunk-ex" data-say="${escapeHtml(ex.en)}" title="点击朗读例句">${escapeHtml(ex.en)}</div>` : ''}
+          ${ex.zh ? `<div class="chunk-ex-zh">${escapeHtml(ex.zh)}</div>` : ''}
+        </div>`;
+      }).join('') : '';
+  const figHtml = emo
+    ? `<div class="qc-fig">${emo}</div>`
+    : `<div class="qc-fig"><span class="letter-fig mini">${escapeHtml((rawWord || '?').charAt(0).toUpperCase())}</span></div>`;
+  const phonetic = data.phonetic || guessPhonetic(rawWord);
+  box.className = 'quick-preview show';
+  box.innerHTML = `
+    <div class="quick-card">
+      ${figHtml}
+      <div class="qc-body">
+        <div class="qc-w">${escapeHtml(rawWord)}</div>
+        ${phonetic ? `<div style="font-size:13px;color:#7c88a3;font-family:ui-monospace,monospace;margin-top:2px">${escapeHtml(phonetic)}</div>` : ''}
+        <div class="qc-zh">${escapeHtml(data.zh || '（未获取到释义，可手动填写）')}</div>
+        <div class="qc-extra">
+          ${badge}
+          ${data.pos ? `<span class="badge" style="background:#f1f5f9;color:#475569">${escapeHtml(data.pos)}</span>` : ''}
+          ${data.cat ? `<span class="cat-tag">${escapeHtml(data.cat)}</span>` : ''}
+          ${data.sentence ? `<div style="margin-top:8px" class="chunk-ex" data-say="${escapeHtml(data.sentence)}" title="点击朗读">📖 ${escapeHtml(data.sentence)}${data.sentenceZh ? `<br>${escapeHtml(data.sentenceZh)}` : ''}</div>` : ''}
+          ${chunkHtml}
+        </div>
+      </div>
+    </div>`;
+}
+async function doQuickLookup(){
+  const w = ($('#quickWord').value || '').trim();
+  if (!w){ playSound('error'); return toast('请先输入一个单词', 'err'); }
+  const we = validateWordOnly(w);
+  if (we){
+    playSound('error');
+    $('#quickPreview').className = 'quick-preview show';
+    $('#quickPreview').innerHTML = `<div class="quick-card"><div class="qc-body">
+      <div class="qc-zh" style="color:#d93025">⚠ 无法识别：${escapeHtml(we)}</div></div></div>`;
+    $('#quickAddBtn').disabled = true;
+    return;
+  }
+  const local = DICT[w.toLowerCase()];
+  if (local){
+    quickResult = Object.assign({}, local);
+    renderQuickPreview(quickResult, w, 'local');
+    $('#quickAddBtn').disabled = false;
+    playSound('match');
+    return;
+  }
+  if (isOnline){
+    $('#quickAddBtn').disabled = true;
+    $('#quickPreview').className = 'quick-preview show';
+    $('#quickPreview').innerHTML = '<div class="quick-card"><div class="qc-body"><span class="loading"></span>正在联网匹配…</div></div>';
+    const data = await onlineLookup(w);
+    quickResult = data;
+    renderQuickPreview(data, w, data.from);
+    $('#quickAddBtn').disabled = (data.from === 'fail' && !data.zh);
+    playSound(data.from === 'fail' ? 'error' : 'match');
+  } else {
+    quickResult = {
+      zh:'', pos:'', cat:'其他',
+      emoji: guessEmoji(w, ''),
+      phonetic: guessPhonetic(w),
+      chunks: [], sentence:'', sentenceZh:'',
+      from:'offline'
+    };
+    renderQuickPreview(quickResult, w, 'offline');
+    $('#quickAddBtn').disabled = false;
+    playSound('error');
+    toast('离线模式：请手动填写释义，恢复网络后会自动补全', '');
+  }
+}
+function doQuickAdd(){
+  const w = ($('#quickWord').value || '').trim();
+  if (!w || !quickResult) return;
+  const dup = words.find(x => x.w.toLowerCase() === w.toLowerCase());
+  if (dup){ playSound('error'); return toast(`「${dup.w}」已在词库中`, 'err'); }
+  const data = quickResult;
+  const cat = (data.cat && data.cat !== '其他') ? data.cat : DEFAULT_CAT;
+  const chunksRaw = (data.chunks || []).map(c => {
+    const text = typeof c === 'string' ? c : c.text;
+    const ex = typeof c === 'string' ? makeChunkExample(c) : { en: c.sentence || '', zh: c.sentenceZh || '' };
+    return { text, sentence: ex.en, sentenceZh: ex.zh, emoji: guessChunkEmoji(text) };
+  });
+  const item = normalizeWord({
+    w: w, d: data.zh || '', cat: cat,
+    emoji: data.emoji || guessEmoji(w, cat),
+    pos: data.pos || '',
+    phonetic: data.phonetic || guessPhonetic(w),
+    chunks: chunksRaw,
+    sentence: data.sentence || '', sentenceZh: data.sentenceZh || ''
+  });
+  enrichFromLocal(item);
+  words.push(item);
+  if (!cats.includes(item.cat)) cats.push(item.cat);
+  saveData();
+  playSound('save');
+  toast(`已添加「${w}」到「${item.cat}」，已自动保存`, 'ok');
+  $('#quickWord').value = '';
+  $('#quickPreview').className = 'quick-preview';
+  $('#quickPreview').innerHTML = '';
+  $('#quickAddBtn').disabled = true;
+  quickResult = null;
+  if (isOnline && !DICT[w.toLowerCase()]){
+    setTimeout(() => autoUpdatePendingItems(), 800);
+  }
+}
+
+/* ===================== 词库列表 ===================== */
+function getFiltered(){
+  const kw = ($('#searchInput').value || '').trim().toLowerCase();
+  const cat = $('#catFilter').value;
+  return words.filter(x => {
+    if (cat && (x.cat || DEFAULT_CAT) !== cat) return false;
+    if (kw){
+      const hit = x.w.toLowerCase().includes(kw) || (x.d || '').toLowerCase().includes(kw);
+      if (!hit) return false;
+    }
+    return true;
+  });
+}
+function renderViewRow(x){
+  return `<div class="word-item" data-id="${x.id}">
+    <div class="row">
+      <input type="checkbox" class="cb" data-id="${x.id}" ${selected.has(x.id) ? 'checked' : ''}>
+      ${miniFigHtml(x)}
+      <span class="w">${escapeHtml(x.w)}</span>
+      <span class="d">${escapeHtml(x.d || '')}</span>
+      <span class="cat-tag">${escapeHtml(x.cat || DEFAULT_CAT)}</span>
+      ${x.wrong ? `<span class="tag">错${x.wrong}</span>` : ''}
+      <button class="edit" data-edit="${x.id}" title="编辑">✎</button>
+      <button data-del="${x.id}" title="删除">×</button>
+    </div>
+  </div>`;
+}
+function renderEditRow(x){
+  const catOpts = cats.map(c =>
+    `<option value="${escapeHtml(c)}" ${c === (x.cat || DEFAULT_CAT) ? 'selected' : ''}>${escapeHtml(c)}</option>`
+  ).join('');
+  return `<div class="word-item" data-id="${x.id}">
+    <div class="row">
+      <input type="checkbox" class="cb" data-id="${x.id}" ${selected.has(x.id) ? 'checked' : ''}>
+      <input class="edit-input w" data-edit-w value="${escapeHtml(x.w)}" placeholder="单词"
+             autocomplete="off" autocorrect="off" spellcheck="false">
+      <input class="edit-input d" data-edit-d value="${escapeHtml(x.d || '')}" placeholder="中文释义"
+             autocomplete="off">
+      <select class="edit-select" data-edit-cat>${catOpts}</select>
+      <button data-save="${x.id}" title="保存">✓</button>
+      <button data-cancel="1" title="取消">✕</button>
+    </div>
+    <div class="row-error"></div>
+  </div>`;
+}
+function renderList(){
+  const el = $('#wordList');
+  if (!el) return;
+  const shown = getFiltered();
+  const wrongCnt = words.filter(x => (x.wrong || 0) > 0).length;
+  $('#listInfo').textContent = `显示 ${shown.length} / 共 ${words.length} 个单词` +
+    (wrongCnt ? `，其中错词 ${wrongCnt} 个` : '') + `，类型 ${cats.length} 种`;
+  if (!shown.length){ el.innerHTML = '<div class="hint">没有符合条件的单词</div>'; return; }
+  el.innerHTML = shown.map(x => x.id === editingId ? renderEditRow(x) : renderViewRow(x)).join('');
+  if (editingId){
+    const box = el.querySelector(`.word-item[data-id="${editingId}"]`);
+    const inp = box && box.querySelector('[data-edit-w]');
+    if (inp){ inp.focus(); inp.select(); }
+  }
+}
+function updateSelInfo(){
+  $('#selInfo').textContent = `已选 ${selected.size} 个`;
+  const disabled = selected.size === 0;
+  $('#batchMoveBtn').disabled = disabled;
+  $('#batchNewCatBtn').disabled = disabled;
+  $('#enrichBtn').disabled = disabled;
+  $('#batchDelBtn').disabled = disabled;
+}
+function liveValidateEdit(box){
+  if (!box) return;
+  const id = box.dataset.id;
+  const wInput = box.querySelector('[data-edit-w]');
+  const dInput = box.querySelector('[data-edit-d]');
+  const errBox = box.querySelector('.row-error');
+  if (!wInput || !errBox) return;
+  const w = wInput.value;
+  const d = dInput ? dInput.value : '';
+  if (!w.trim()){
+    errBox.className = 'row-error'; errBox.textContent = '';
+    wInput.classList.remove('input-bad', 'input-ok');
+    box._lastErr = '';
+    return;
+  }
+  const { errors, warnings } = validateEntry(w, d, id);
+  const errStr = errors.join('；');
+  if (errors.length){
+    errBox.className = 'row-error show';
+    errBox.textContent = '⚠ ' + errStr;
+    wInput.classList.add('input-bad'); wInput.classList.remove('input-ok');
+    if (errStr !== box._lastErr){ playSound('error'); box._lastErr = errStr; }
+  } else if (warnings.length){
+    errBox.className = 'row-error show warn';
+    errBox.textContent = 'ℹ ' + warnings.join('；');
+    wInput.classList.remove('input-bad'); wInput.classList.add('input-ok');
+    if (box._lastErr) playSound('tick');
+    box._lastErr = '';
+  } else {
+    errBox.className = 'row-error'; errBox.textContent = '';
+    wInput.classList.remove('input-bad'); wInput.classList.add('input-ok');
+    if (box._lastErr) playSound('tick');
+    box._lastErr = '';
+  }
+}
+function saveEdit(id){
+  const box = document.querySelector(`.word-item[data-id="${id}"]`);
+  if (!box) return;
+  const w   = box.querySelector('[data-edit-w]').value;
+  const d   = box.querySelector('[data-edit-d]').value;
+  const cat = box.querySelector('[data-edit-cat]').value;
+  const errBox = box.querySelector('.row-error');
+  const { errors, warnings, word, mean } = validateEntry(w, d, id);
+  if (errors.length){
+    errBox.className = 'row-error show';
+    errBox.textContent = '⚠ 无法保存：' + errors.join('；');
+    box.querySelector('[data-edit-w]').classList.add('input-bad');
+    playSound('error');
+    toast('修改有误，请检查：\n' + errors.join('\n'), 'err');
+    return;
+  }
+  const item = words.find(x => x.id === id);
+  if (!item) return;
+  const changed = item.w !== word || (item.d || '') !== mean || (item.cat || DEFAULT_CAT) !== cat;
+  item.w = word; item.d = mean; item.cat = cat;
+  if (!cats.includes(cat)) cats.push(cat);
+  item.emoji = ''; item.phonetic = '';
+  enrichFromLocal(item, { force: true });
+  editingId = null;
+  saveData();
+  if (!changed) toast('没有改动', '');
+  else if (warnings.length){ playSound('save'); toast('已保存。提示：' + warnings.join('；'), ''); }
+  else { playSound('save'); toast('已保存 ✓', 'ok'); }
+}
+function updateBulkStatus(){
+  const text = $('#bulk').value.trim();
+  const el = $('#bulkStatus');
+  if (!text){
+    el.textContent = ''; el.className = 'bulk-status'; el._lastState = '';
+    return;
+  }
+  const parsed = parseInput(text);
+  const bad = [];
+  const seen = new Set();
+  let matched = 0;
+  parsed.forEach(p => {
+    const we = validateWordOnly(p.w);
+    if (we){ bad.push(p.w + '（' + we + '）'); return; }
+    const k = p.w.toLowerCase();
+    if (seen.has(k)){ bad.push(p.w + '（本次重复）'); return; }
+    seen.add(k);
+    if (DICT[k] || EMOJI_MAP_NORM[k]) matched++;
+  });
+  if (bad.length){
+    el.className = 'bulk-status bad';
+    el.textContent = `⚠ 解析到 ${parsed.length} 个单词，其中 ${bad.length} 个有问题：` +
+      bad.slice(0, 5).join('、') + (bad.length > 5 ? ' …' : '');
+    const sig = 'bad:' + bad.length + ':' + bad[0];
+    if (el._lastState !== sig){ playSound('error'); el._lastState = sig; }
+  } else {
+    el.className = 'bulk-status ok';
+    el.textContent = `✓ 解析到 ${parsed.length} 个单词，格式正常` +
+      (matched ? `，其中 ${matched} 个可自动补全图片/释义/音标` : '');
+    const sig = 'ok:' + parsed.length + ':' + matched;
+    if (el._lastState && el._lastState !== sig) playSound('tick');
+    el._lastState = sig;
+  }
+}
+function importWords(mode){
+  const text = $('#bulk').value;
+  const parsed = parseInput(text);
+  if (!parsed.length){ playSound('error'); return alert('没有解析到任何单词'); }
+  const targetCat = $('#importCat').value;
+  const auto = (targetCat === AUTO_CAT);
+  const errors = [];
+  const seen = new Set();
+  const list = [];
+  parsed.forEach(p => {
+    const we = validateWordOnly(p.w);
+    if (we){ errors.push(`「${p.w}」${we}`); return; }
+    const k = p.w.toLowerCase();
+    if (seen.has(k)){ errors.push(`「${p.w}」在本次导入中重复出现`); return; }
+    seen.add(k);
+    list.push({ w: p.w.trim(), d: (p.d || '').trim(), cat: (p.cat || '').trim() });
+  });
+  if (!list.length){
+    playSound('error');
+    return alert('没有有效的单词可导入：\n' + errors.slice(0, 10).join('\n'));
+  }
+  const resolveCat = (x) => {
+    if (x.cat) return x.cat;
+    if (x.w.includes(' ')) return '短语';
+    if (auto){
+      const d = DICT[x.w.toLowerCase()];
+      if (d && d.cat && d.cat !== '其他') return d.cat;
+      return guessCat(x.w, '');
+    }
+    return targetCat;
+  };
+  const build = (x) => {
+    const cat = resolveCat(x);
+    const it = normalizeWord({ w: x.w, d: x.d, cat });
+    it.emoji = ''; it.phonetic = '';
+    enrichFromLocal(it);
+    if (!cats.includes(it.cat)) cats.push(it.cat);
+    return it;
+  };
+  let msg = '';
+  if (mode === 'replace'){
+    if (!confirm(`将清空原词库，导入 ${list.length} 个单词，确定吗？`)) return;
+    words = list.map(build);
+    selected.clear();
+    msg = `已导入 ${words.length} 个单词，已自动保存`;
+  } else {
+    const map = new Map(words.map(x => [x.w.toLowerCase(), x]));
+    let added = 0, updated = 0;
+    list.forEach(x => {
+      const k = x.w.toLowerCase();
+      if (map.has(k)){
+        const it = map.get(k);
+        if (x.d) it.d = x.d;
+        if (x.cat) it.cat = x.cat;
+        else if (!auto) it.cat = resolveCat(x);
+        if (!cats.includes(it.cat)) cats.push(it.cat);
+        it.emoji = ''; it.phonetic = '';
+        enrichFromLocal(it);
+        updated++;
+      } else {
+        const it = build(x);
+        words.push(it); map.set(k, it); added++;
+      }
+    });
+    msg = `新增 ${added} 个，更新 ${updated} 个，共 ${words.length} 个，已自动保存`;
+  }
+  saveData();
+  if (errors.length){
+    playSound('error');
+    msg += `\n\n已跳过 ${errors.length} 条无效行：\n` + errors.slice(0, 8).join('\n');
+    if (errors.length > 8) msg += `\n……还有 ${errors.length - 8} 条`;
+  } else {
+    playSound('complete');
+  }
+  const unknownWords = list
+    .filter(x => !DICT[x.w.toLowerCase()] && !EMOJI_MAP_NORM[x.w.toLowerCase()])
+    .map(x => x.w);
+  if (unknownWords.length){
+    msg += `\n\n⚠️ 拼写检查：以下 ${unknownWords.length} 个单词不在内置词典中，请确认拼写：\n` +
+      unknownWords.slice(0, 12).join('、') +
+      (unknownWords.length > 12 ? ` 等 ${unknownWords.length} 个` : '');
+  }
+  alert(msg);
+  if (isOnline) setTimeout(() => autoUpdatePendingItems(), 500);
+}
+async function enrichSelected(){
+  if (!selected.size) return;
+  const targets = words.filter(x => selected.has(x.id));
+  // 强制重算配图 / 例句，修正历史错误数据
+  targets.forEach(x => {
+    x.emoji = '';
+    enrichFromLocal(x, { force: true });
+  });
+  if (isOnline){
+    const needOnline = targets.filter(x => !DICT[x.w.toLowerCase()]);
+    if (needOnline.length){
+      const go = confirm(`选中的 ${targets.length} 个词中，有 ${needOnline.length} 个不在内置词典里，是否联网查询？`);
+      if (go){
+        const limit = Math.min(needOnline.length, 15);
+        for (let i = 0; i < limit; i++){
+          const it = needOnline[i];
+          try {
+            const data = await onlineLookup(it.w);
+            if (data.zh && !it.d) it.d = data.zh;
+            if (data.emoji && !it.emoji) it.emoji = data.emoji;
+            if (data.pos && !it.pos) it.pos = data.pos;
+            if (data.phonetic && !it.phonetic) it.phonetic = data.phonetic;
+            if (data.sentence && (!it.sentence || /^This is (a|an) /i.test(it.sentence))) it.sentence = data.sentence;
+            if (data.sentenceZh && !it.sentenceZh) it.sentenceZh = data.sentenceZh;
+            if (data.cat && data.cat !== '其他' && (!it.cat || it.cat === DEFAULT_CAT)) it.cat = data.cat;
+            if (!cats.includes(it.cat)) cats.push(it.cat);
+            enrichFromLocal(it);
+          } catch(e){}
+        }
+        if (needOnline.length > limit) toast(`已处理前 ${limit} 个，剩余请分批操作`, '');
+      }
+    }
+    saveData();
+    playSound('save');
+    toast(`已补全 ${targets.length} 个词条`, 'ok');
+  } else {
+    saveData();
+    playSound('save');
+    toast(`离线模式：已本地补全 ${targets.length} 个词条`, 'ok');
+  }
+}
+
+/* ===================== 拍照识别 ===================== */
+let ocrBusy = false;
+async function doOCR(file){
+  if (!file || ocrBusy) return;
+  if (typeof Tesseract === 'undefined'){
+    playSound('error');
+    toast('OCR 引擎未加载，请确认 lib/tesseract.min.js 存在', 'err');
+    return;
+  }
+  ocrBusy = true;
+  playSound('ocr');
+  const area = $('#ocrArea');
+  const preview = $('#ocrPreview');
+  const status = $('#ocrStatus');
+  const barWrap = $('#ocrProgress');
+  const bar = barWrap.querySelector('div');
+  area.classList.add('show');
+  $('#ocrClearBtn').style.display = '';
+  preview.src = URL.createObjectURL(file);
+  status.textContent = '正在识别（离线引擎）…';
+  barWrap.style.display = '';
+  bar.style.width = '0%';
+  try {
+    const { data: { text } } = await Tesseract.recognize(file, 'eng+chi_sim', {
+      workerPath: './lib/worker.min.js',
+      corePath:   './lib/',
+      langPath:   './lib/',
+      logger: m => {
+        if (m.status === 'recognizing text'){
+          const p = Math.round((m.progress || 0) * 100);
+          bar.style.width = p + '%';
+          status.textContent = `正在识别… ${p}%`;
+        } else if (m.status){ status.textContent = m.status; }
+      }
+    });
+    const lines = (text || '').split(/\r?\n/).map(l => l.trim())
+      .filter(l => l && /[a-zA-Z]/.test(l) && l.length <= 60)
+      .map(l => l.replace(/[^\x20-\x7E\u4e00-\u9fff]+/g, ' ').replace(/\s+/g, ' ').trim())
+      .filter(l => /[a-zA-Z]{2,}/.test(l));
+    const seen = new Set();
+    const clean = [];
+    lines.forEach(l => {
+      const k = l.toLowerCase();
+      if (!seen.has(k)){ seen.add(k); clean.push(l); }
+    });
+    if (!clean.length){
+      status.textContent = '未识别到有效单词，换个角度或更清晰的照片再试';
+      playSound('error');
+    } else {
+      const formatted = clean.map(line => {
+        const m = line.match(/^([a-zA-Z][a-zA-Z\s'\-.·]+?)\s+([\u4e00-\u9fff].+)$/);
+        if (m) return `${m[1].trim()} | ${m[2].trim()}`;
+        return line;
+      });
+      const cur = $('#bulk').value.trim();
+      $('#bulk').value = (cur ? cur + '\n' : '') + formatted.join('\n');
+      updateBulkStatus();
+      status.textContent = `✓ 识别到 ${clean.length} 行，已填入下方文本框`;
+      playSound('match');
+    }
+    bar.style.width = '100%';
+  } catch(err){
+    console.error(err);
+    status.textContent = '识别失败：' + (err && err.message ? err.message : '未知错误');
+    playSound('error');
+  } finally {
+    ocrBusy = false;
+    setTimeout(() => { barWrap.style.display = 'none'; }, 800);
+  }
+}
+
+/* ===================== 事件绑定 ===================== */
+document.querySelectorAll('nav button[data-tab]').forEach(b => {
+  b.onclick = () => {
+    playSound('click');
+    document.querySelectorAll('nav button[data-tab]').forEach(x => x.classList.toggle('active', x === b));
+    $('#tab-study').hidden = b.dataset.tab !== 'study';
+    $('#tab-edit').hidden  = b.dataset.tab !== 'edit';
+    if (b.dataset.tab === 'edit'){ renderList(); renderCatList(); renderBackupStatus(); renderDictationCatPicker(); }
+    stopAllSpeech();
+    if (recognition && recognizing){ try { recognition.stop(); } catch(e){} }
+  };
+});
+$('#soundToggle').onclick = () => setSoundEnabled(!soundEnabled);
+$('#netBadge').onclick = () => {
+  toast(isOnline ? '当前：在线（可使用真人发音和在线词典）' : '当前：离线（全部走本地）', '');
+};
+document.querySelectorAll('#accentToggle button').forEach(b => {
+  b.onclick = () => {
+    playSound('click');
+    setAccent(b.dataset.accent);
+    toast(b.dataset.accent === 'uk' ? '已切换到英式发音 🇬🇧' : '已切换到美式发音 🇺🇸', 'ok');
+  };
+});
+
+/* 点击带 data-say 的元素朗读（卡片例句、词块、例句等） */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-say]');
+  if (!el) return;
+  if (el.closest('#wordList')) return;
+  const text = el.dataset.say;
+  if (!text) return;
+  e.preventDefault();
+  e.stopPropagation();
+  speak(text);
+});
+
+$('#catList').addEventListener('click', e => {
+  const btn = e.target.closest('[data-del-cat]');
+  if (!btn || btn.disabled) return;
+  const cat = btn.dataset.delCat;
+  if (cat) deleteCat(cat);
+});
+$('#startBtn').onclick  = startSession;
+$('#prevBtn').onclick   = goPrev;
+$('#playBtn').onclick   = () => { const it = currentItem(); if (it) speak(it.w); };
+$('#spellBtn').onclick  = () => { const it = currentItem(); if (it) spellWord(it.w); };
+$('#playSentenceBtn').onclick = () => {
+  const it = currentItem();
+  if (!it) return;
+  const s = it.sentence || '';
+  if (s) speak(s);
+  else toast('这个单词还没有例句', '');
+};
+$('#hintBtn').onclick   = showHint;
+$('#showAnswerBtn').onclick = showAnswer;
+$('#submitBtn').onclick = submitAnswer;
+$('#nextBtn').onclick   = () => { if (session) { playSound('click'); next(); } };
+$('#mode').addEventListener('change', () => {
+  const m = $('#mode').value;
+  $('#playSentenceBtn').style.display = 'none';
+  if (m === 'card') $('#playSentenceBtn').style.display = '';
+});
+$('#answer').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); submitAnswer(); }
+  if (e.key === ' ' && $('#answer').value === ''){ e.preventDefault(); const it = currentItem(); if (it) speak(it.w); }
+});
+$('#answer').addEventListener('input', () => {
+  $('#answer').classList.remove('input-bad', 'input-ok');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !$('#tab-study').hidden && session && session.answered &&
+      session.mode !== 'card' && session.mode !== 'pronounce'){
+    e.preventDefault(); next();
+  }
+});
+$('#options').addEventListener('click', e => {
+  const b = e.target.closest('.opt');
+  if (!b || b.dataset.i === undefined || !session || session.answered || !session.opts) return;
+  const item = currentItem();
+  const ok = session.opts[+b.dataset.i].w === item.w;
+  b.classList.add(ok ? 'ok' : 'bad');
+  if (!ok){
+    [...$('#options').children].forEach((el, i) => {
+      if (session.opts[i] && session.opts[i].w === item.w) el.classList.add('ok');
+    });
+  }
+  check(ok, item);
+});
+$('#quickLookupBtn').onclick = doQuickLookup;
+$('#quickAddBtn').onclick    = doQuickAdd;
+$('#quickWord').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); doQuickLookup(); }
+});
+$('#quickWord').addEventListener('input', debounce(() => {
+  const w = ($('#quickWord').value || '').trim().toLowerCase();
+  if (!w){ $('#quickAddBtn').disabled = true; return; }
+  if (DICT[w]){
+    quickResult = Object.assign({}, DICT[w]);
+    renderQuickPreview(quickResult, $('#quickWord').value.trim(), 'local');
+    $('#quickAddBtn').disabled = false;
+  }
+}, 500));
+$('#downloadTplBtn').onclick = downloadTemplate;
+$('#excelUploadBtn').onclick = () => $('#excelFile').click();
+$('#excelExportBtn').onclick = exportToExcel;
+$('#excelFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) handleExcelUpload(f);
+  e.target.value = '';
+});
+
+/* ===== 默写纸多选分类交互 ===== */
+$('#dictationCatBtn').onclick = e => {
+  e.stopPropagation();
+  playSound('click');
+  const pop = $('#dictationCatPop');
+  pop.hidden = !pop.hidden;
+};
+$('#dictationCatPop').addEventListener('click', e => {
+  e.stopPropagation();
+  const allBtn = e.target.closest('#dictationCatAll');
+  const noneBtn = e.target.closest('#dictationCatNone');
+  if (allBtn){
+    cats.forEach(c => dictationCats.add(c));
+    renderDictationCatPicker();
+    playSound('tick');
+    return;
+  }
+  if (noneBtn){
+    dictationCats.clear();
+    renderDictationCatPicker();
+    playSound('tick');
+    return;
+  }
+  const cb = e.target.closest('input[type=checkbox]');
+  if (cb && cb.value !== undefined){
+    if (cb.checked) dictationCats.add(cb.value);
+    else dictationCats.delete(cb.value);
+    updateDictationCatBtn();
+    playSound('tick');
+  }
+});
+document.addEventListener('click', e => {
+  const ms = $('#dictationCatMS');
+  if (ms && !ms.contains(e.target)) closeDictationPop();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDictationPop();
+});
+
+$('#dictationExportBtn').onclick = exportDictationPaper;
+$('#ocrBtn').onclick = () => $('#ocrFile').click();
+$('#ocrFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) doOCR(f);
+  e.target.value = '';
+});
+$('#ocrClearBtn').onclick = () => {
+  $('#ocrArea').classList.remove('show');
+  $('#ocrPreview').src = '';
+  $('#ocrStatus').textContent = '';
+  $('#ocrClearBtn').style.display = 'none';
+  playSound('click');
+};
+$('#addCatBtn').onclick = () => {
+  const name = ($('#newCatInput').value || '').trim();
+  if (!name){ playSound('error'); return toast('请输入类型名称', 'err'); }
+  if (cats.includes(name)){ playSound('error'); return toast('该类型已存在', 'err'); }
+  cats.push(name);
+  $('#newCatInput').value = '';
+  saveData();
+  $('#importCat').value = name;
+  playSound('save');
+  toast(`已新建类型「${name}」`, 'ok');
+};
+$('#saveBtn').onclick   = () => importWords('replace');
+$('#appendBtn').onclick = () => importWords('append');
+$('#exportBtn').onclick = () => {
+  const selCat = $('#exportCat').value;
+  const list = buildGroupedExportList(selCat);
+  if (!list.length){
+    playSound('error');
+    return toast('没有可导出的单词', 'err');
+  }
+  const label = selCat === ALL_CAT ? '全部分类' : selCat;
+  const lines = list.map(x => `${x.w} | ${x.d} | ${x.exportCat}`);
+  $('#bulk').value = lines.join('\n');
+  $('#bulk').select();
+  updateBulkStatus();
+  playSound('save');
+  toast(`已导出 ${list.length} 个单词（${label}）`, 'ok');
+};
+$('#clearBtn').onclick = async () => {
+  if (!words.length){ playSound('error'); return toast('词库已经是空的', 'err'); }
+  const ok = await confirmDialog({
+    title: '清空整个词库？',
+    message: `即将删除全部 <b>${words.length}</b> 个单词，此操作<b>不可恢复</b>。建议先导出备份。`,
+    icon: '🗑️', confirmText: '确认清空'
+  });
+  if (!ok) return;
+  words = []; selected.clear(); editingId = null;
+  saveData(); playSound('delete');
+  toast('词库已清空', 'ok');
+};
+$('#bulk').addEventListener('input', debounce(updateBulkStatus, 400));
+$('#searchInput').addEventListener('input', renderList);
+$('#catFilter').addEventListener('change', renderList);
+$('#selectAllBtn').onclick = () => {
+  getFiltered().forEach(x => selected.add(x.id));
+  renderList(); updateSelInfo(); playSound('click');
+};
+$('#clearSelBtn').onclick = () => {
+  selected.clear(); renderList(); updateSelInfo(); playSound('click');
+};
+$('#batchMoveBtn').onclick = async () => {
+  if (!selected.size){ playSound('error'); return; }
+  const cat = $('#batchCat').value || DEFAULT_CAT;
+  const ok = await confirmDialog({
+    title: '批量修改类型',
+    message: `将选中的 <b>${selected.size}</b> 个单词移动到「${escapeHtml(cat)}」？`,
+    icon: '📁', confirmText: '确认修改', danger: false
+  });
+  if (!ok) return;
+  words.forEach(x => { if (selected.has(x.id)) x.cat = cat; });
+  saveData(); playSound('save');
+  toast(`已将 ${selected.size} 个单词设为「${cat}」`, 'ok');
+};
+$('#batchNewCatBtn').onclick = async () => {
+  if (!selected.size){ playSound('error'); return; }
+  const name = prompt('请输入新的类型名称：');
+  if (name === null) return;
+  const n = name.trim();
+  if (!n){ playSound('error'); return toast('类型名称不能为空', 'err'); }
+  if (!cats.includes(n)) cats.push(n);
+  words.forEach(x => { if (selected.has(x.id)) x.cat = n; });
+  saveData();
+  $('#batchCat').value = n;
+  playSound('save');
+  toast(`已将 ${selected.size} 个单词设为「${n}」`, 'ok');
+};
+$('#enrichBtn').onclick = enrichSelected;
+$('#batchDelBtn').onclick = async () => {
+  if (!selected.size){ playSound('error'); return; }
+  const ok = await confirmDialog({
+    title: '批量删除单词',
+    message: `即将删除选中的 <b>${selected.size}</b> 个单词，此操作<b>不可恢复</b>。`,
+    icon: '⚠️', confirmText: '确认删除'
+  });
+  if (!ok) return;
+  words = words.filter(x => !selected.has(x.id));
+  const n = selected.size;
+  selected.clear(); editingId = null;
+  saveData(); playSound('delete');
+  toast(`已删除 ${n} 个单词`, 'ok');
+};
+$('#wordList').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del){
+    const id = del.dataset.del;
+    const it = words.find(x => x.id === id);
+    if (!it) return;
+    const ok = await confirmDialog({
+      title: '删除这个单词？',
+      message: `即将删除「<b>${escapeHtml(it.w)}</b>」${it.d ? '（' + escapeHtml(it.d) + '）' : ''}，此操作不可恢复。`,
+      icon: '🗑️', confirmText: '确认删除'
+    });
+    if (!ok) return;
+    words = words.filter(x => x.id !== id);
+    selected.delete(id);
+    if (editingId === id) editingId = null;
+    saveData(); playSound('delete');
+    toast('已删除', 'ok');
+    return;
+  }
+  const edit = e.target.closest('[data-edit]');
+  if (edit){ editingId = edit.dataset.edit; renderList(); playSound('click'); return; }
+  const save = e.target.closest('[data-save]');
+  if (save){ saveEdit(save.dataset.save); return; }
+  const cancel = e.target.closest('[data-cancel]');
+  if (cancel){ editingId = null; playSound('click'); renderList(); return; }
+});
+$('#wordList').addEventListener('change', e => {
+  const cb = e.target.closest('.cb');
+  if (!cb) return;
+  if (cb.checked) selected.add(cb.dataset.id);
+  else selected.delete(cb.dataset.id);
+  updateSelInfo();
+});
+$('#wordList').addEventListener('input', debounce(e => {
+  if (!editingId) return;
+  const box = e.target.closest('.word-item');
+  if (!box || box.dataset.id !== editingId) return;
+  liveValidateEdit(box);
+}, 350));
+$('#wordList').addEventListener('keydown', e => {
+  if (!editingId) return;
+  if (e.key === 'Enter'){ e.preventDefault(); saveEdit(editingId); }
+  if (e.key === 'Escape'){ e.preventDefault(); editingId = null; playSound('click'); renderList(); }
+});
+$('#backupNowBtn').onclick = () => {
+  playSound('click');
+  backupSave({ words, cats, savedAt: Date.now() }).then(ok => {
+    if (ok){
+      renderBackupStatus();
+      playSound('backup');
+      toast('✅ 已备份 ' + words.length + ' 个单词到浏览器', 'ok');
+    } else {
+      playSound('error');
+      toast('备份失败，请检查浏览器存储权限', 'err');
+    }
+  }).catch(() => {});
+};
+$('#downloadBackupBtn').onclick = () => {
+  if (!words.length){ playSound('error'); return toast('词库为空，无需备份', 'err'); }
+  const data = { words, cats, exportedAt: Date.now(), version: 4 };
+  const ts = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const filename = `单词听默器备份_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  downloadJSON(data, filename);
+  playSound('save');
+  toast('已下载备份文件到本地', 'ok');
+};
+$('#restoreBackupBtn').onclick = async () => {
+  const ok = await confirmDialog({
+    title: '从文件恢复词库',
+    message: '将从选择的 JSON 备份文件中恢复词库，当前词库会被<b>覆盖</b>。建议先备份当前数据。',
+    icon: '📂', confirmText: '选择文件', danger: false
+  });
+  if (!ok) return;
+  $('#restoreFile').click();
+};
+$('#restoreFile').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const list = data.words || data;
+      if (!Array.isArray(list) || !list.length) throw new Error('文件中没有有效词库数据');
+      const ok = await confirmDialog({
+        title: '确认恢复？',
+        message: `将从文件恢复 <b>${list.length}</b> 个单词，当前词库会被覆盖。`,
+        icon: '⚠️', confirmText: '确认恢复'
+      });
+      if (!ok) return;
+      words = list.map(normalizeWord);
+      words.forEach(w => enrichFromLocal(w, { force: true }));
+      if (Array.isArray(data.cats) && data.cats.length){
+        cats = data.cats.slice();
+        if (!cats.includes(DEFAULT_CAT)) cats.unshift(DEFAULT_CAT);
+      }
+      words.forEach(x => { if (x.cat && !cats.includes(x.cat)) cats.push(x.cat); });
+      saveData();
+      backupSave({ words, cats, savedAt: Date.now() }).then(() => renderBackupStatus()).catch(() => {});
+      playSound('restore');
+      toast(`已从文件恢复 ${words.length} 个单词`, 'ok');
+    } catch(err){
+      playSound('error');
+      toast('恢复失败：' + (err.message || '文件格式不正确'), 'err');
+    }
+  };
+  reader.readAsText(f);
+});
+
+/* ===================== 数据持久化保护 ===================== */
+window.addEventListener('beforeunload', () => {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(words));
+    localStorage.setItem(LS_CATS, JSON.stringify(cats));
+  } catch(e){}
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden'){
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(words));
+      localStorage.setItem(LS_CATS, JSON.stringify(cats));
+    } catch(e){}
+  }
+});
+
+/* ===================== 初始化 ===================== */
+(function init(){
+  updateNetBadge();
+  try {
+    loadDataSync();
+    refreshCatSelects();
+    renderList();
+    renderCatList();
+    updateSelInfo();
+    setSoundEnabled(soundEnabled);
+    setAccent(accent);
+    renderBackupStatus();
+    $('#playSentenceBtn').style.display = 'none';
+    $('#showAnswerBtn').style.display = 'none';
+    if (words.length) toast('已自动载入 ' + words.length + ' 个单词', 'ok');
+  } catch(e){
+    console.error('初始化失败：', e);
+  }
+  try {
+    if (!words.length) tryRestoreFromBackup();
+    else scheduleBackup();
+  } catch(e){
+    console.error('备份初始化失败：', e);
+  }
+  if (isOnline){
+    setTimeout(() => autoUpdatePendingItems(), 3000);
+  }
+})();
+</script>
+</body>
+</html>
